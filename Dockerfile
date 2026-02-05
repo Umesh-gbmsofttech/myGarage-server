@@ -1,14 +1,13 @@
-# Use an official OpenJDK runtime as a parent image
-FROM eclipse-temurin:17-jdk-jammy
-
-# Set the working directory in the container
+# ---------- Stage 1: Build the jar ----------
+FROM maven:3.9.6-eclipse-temurin-17 AS build
 WORKDIR /app
+COPY . .
+RUN mvn clean package -DskipTests
 
-# Copy the executable JAR file into the container
-COPY target/my-garage-app-0.0.1-SNAPSHOT.jar app.jar
+# ---------- Stage 2: Run the jar ----------
+FROM eclipse-temurin:17-jdk-jammy
+WORKDIR /app
+COPY --from=build /app/target/*.jar app.jar
 
-# Make port 8080 available to the world outside this container
 EXPOSE 8080
-
-# Run the JAR file
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT ["sh", "-c", "java -jar app.jar --server.port=$PORT"]
