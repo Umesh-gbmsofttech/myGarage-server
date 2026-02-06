@@ -19,5 +19,5 @@ Please ensure you have a local MySQL server running with these credentials.
 
 The production database is hosted on Aiven. To connect to the Aiven database, you need to:
 1.  Obtain the `aiven-ca.pem` certificate file.
-2.  Place the `aiven-ca.pem` file in the `src/main/resources` directory.
+2.  Place the `aiven-ca.pem` file in the base directory where the Dockerfile is placed.
 3.  In the `application.properties` file, comment out the local database configuration and uncomment the Aiven database configuration.
