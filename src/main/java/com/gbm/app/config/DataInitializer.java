@@ -26,12 +26,12 @@ public class DataInitializer implements CommandLineRunner {
         if (userRepository.findByUsername("MyGarageAdmin").isEmpty()) {
             User admin = new User();
             admin.setUsername("MyGarageAdmin");
-            admin.setEmail("mygarage.admin@gmail.com");
+            admin.setEmail("mygarageadmin@gmail.com");
             admin.setFirstName("Admin");
             admin.setSurname("User");
             admin.setMobile("+91 9226224019");
             admin.setRole(Role.ADMIN);
-            admin.setPasswordHash(passwordEncoder.encode("Password"));
+            admin.setPasswordHash(passwordEncoder.encode("Garage@123"));
             userRepository.save(admin);
         }
 
