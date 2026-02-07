@@ -24,6 +24,7 @@ public class ProfileService {
     private final MechanicProfileRepository mechanicProfileRepository;
     private final VehicleOwnerProfileRepository vehicleOwnerProfileRepository;
     private final AdminSettingsRepository adminSettingsRepository;
+    private final ProfileImageStorageService profileImageStorageService;
 
     public UserProfileResponse getProfile(User user) {
         UserProfileResponse response = new UserProfileResponse();
@@ -125,6 +126,22 @@ public class ProfileService {
             vehicleOwnerProfileRepository.save(profile);
         }
 
+        return getProfile(user);
+    }
+
+    public UserProfileResponse uploadProfileImage(User user, org.springframework.web.multipart.MultipartFile file) {
+        String url = profileImageStorageService.store(file);
+        if (user.getRole() == Role.MECHANIC) {
+            MechanicProfile profile = mechanicProfileRepository.findByUserId(user.getId())
+                .orElseThrow(() -> new IllegalArgumentException("Mechanic profile missing"));
+            profile.setProfileImageUrl(url);
+            mechanicProfileRepository.save(profile);
+        } else if (user.getRole() == Role.VEHICLE_OWNER) {
+            VehicleOwnerProfile profile = vehicleOwnerProfileRepository.findByUserId(user.getId())
+                .orElseThrow(() -> new IllegalArgumentException("Owner profile missing"));
+            profile.setAvatarUrl(url);
+            vehicleOwnerProfileRepository.save(profile);
+        }
         return getProfile(user);
     }
 }
