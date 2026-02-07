@@ -3,6 +3,7 @@ package com.gbm.app.service;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.gbm.app.dto.AdminSettingsRequest;
 import com.gbm.app.dto.BannerRequest;
@@ -22,6 +23,7 @@ public class AdminService {
     private final BannerRepository bannerRepository;
     private final AdminSettingsRepository adminSettingsRepository;
     private final MechanicProfileRepository mechanicProfileRepository;
+    private final BannerStorageService bannerStorageService;
 
     public List<Banner> listBanners() {
         return bannerRepository.findAll();
@@ -38,7 +40,7 @@ public class AdminService {
 
     public Banner updateBanner(Long id, BannerRequest request) {
         Banner banner = bannerRepository.findById(id)
-            .orElseThrow(() -> new IllegalArgumentException("Banner not found"));
+                .orElseThrow(() -> new IllegalArgumentException("Banner not found"));
         if (request.getImageUrl() != null) {
             banner.setImageUrl(request.getImageUrl());
         }
@@ -49,7 +51,18 @@ public class AdminService {
     }
 
     public void deleteBanner(Long id) {
-        bannerRepository.deleteById(id);
+        Banner banner = bannerRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Banner not found"));
+        bannerRepository.delete(banner);
+        bannerStorageService.delete(banner.getImageUrl());
+    }
+
+    public Banner uploadBanner(MultipartFile file) {
+        String url = bannerStorageService.store(file);
+        Banner banner = new Banner();
+        banner.setImageUrl(url);
+        banner.setActive(true);
+        return bannerRepository.save(banner);
     }
 
     public AdminSettings getSettings() {
@@ -69,7 +82,7 @@ public class AdminService {
 
     public MechanicProfile updateMechanicVisibility(Long mechanicUserId, boolean visible) {
         MechanicProfile profile = mechanicProfileRepository.findByUserId(mechanicUserId)
-            .orElseThrow(() -> new IllegalArgumentException("Mechanic profile not found"));
+                .orElseThrow(() -> new IllegalArgumentException("Mechanic profile not found"));
         profile.setVisible(visible);
         return mechanicProfileRepository.save(profile);
     }
