@@ -1,5 +1,6 @@
 package com.gbm.app.config;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
@@ -9,32 +10,61 @@ import org.springframework.validation.annotation.Validated;
 public class ApiKeysConfig {
 
     @NotBlank
-    private String googleMaps;
+    private String openAi;
 
     @NotBlank
-    private String gemini;
+    private String openRouteService;
 
-    public String getGoogleMaps() {
-        return googleMaps;
+    @Valid
+    private MapConfig map = new MapConfig();
+
+    public String getOpenAiKey() {
+        return openAi;
     }
 
-    public void setGoogleMaps(String googleMaps) {
-        this.googleMaps = googleMaps;
+    public String getOpenRouteServiceKey() {
+        return openRouteService;
     }
 
-    public String getGemini() {
-        return gemini;
+    public String getMapTilerKey() {
+        return map.getTiler();
     }
 
-    public void setGemini(String gemini) {
-        this.gemini = gemini;
+    public String getOpenAi() {
+        return openAi;
     }
 
-    public String getGoogleMapsKey() {
-        return googleMaps;
+    public void setOpenAi(String openAi) {
+        this.openAi = openAi;
     }
 
-    public String getGeminiKey() {
-        return gemini;
+    public String getOpenRouteService() {
+        return openRouteService;
+    }
+
+    public void setOpenRouteService(String openRouteService) {
+        this.openRouteService = openRouteService;
+    }
+
+    public MapConfig getMap() {
+        return map;
+    }
+
+    public void setMap(MapConfig map) {
+        this.map = map;
+    }
+
+    public static class MapConfig {
+
+        @NotBlank
+        private String tiler;
+
+        public String getTiler() {
+            return tiler;
+        }
+
+        public void setTiler(String tiler) {
+            this.tiler = tiler;
+        }
     }
 }

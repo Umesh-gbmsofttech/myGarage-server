@@ -3,6 +3,7 @@ package com.gbm.app.controller;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.gbm.app.exception.UpstreamServiceException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -28,5 +29,12 @@ public class ApiExceptionHandler {
             .orElse("Validation error");
         body.put("error", message);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+    }
+
+    @ExceptionHandler(UpstreamServiceException.class)
+    public ResponseEntity<Map<String, String>> handleUpstream(UpstreamServiceException ex) {
+        Map<String, String> body = new HashMap<>();
+        body.put("error", ex.getMessage());
+        return ResponseEntity.status(ex.getStatus()).body(body);
     }
 }
