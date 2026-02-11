@@ -1,39 +1,44 @@
 package com.gbm.app.controller;
 
-import com.gbm.app.service.GoogleMapsService;
+import com.gbm.app.config.ApiKeysConfig;
+import com.gbm.app.dto.DirectionsRequest;
+import com.gbm.app.dto.DirectionsResponse;
+import com.gbm.app.dto.MapConfigResponse;
+import com.gbm.app.dto.RoutingStatsResponse;
+import com.gbm.app.service.OpenRouteService;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/maps")
 public class MapsController {
 
-    private final GoogleMapsService googleMapsService;
+    private final OpenRouteService openRouteService;
+    private final ApiKeysConfig apiKeysConfig;
 
-    public MapsController(GoogleMapsService googleMapsService) {
-        this.googleMapsService = googleMapsService;
+    public MapsController(OpenRouteService openRouteService, ApiKeysConfig apiKeysConfig) {
+        this.openRouteService = openRouteService;
+        this.apiKeysConfig = apiKeysConfig;
     }
 
-    @GetMapping("/geocode")
-    public ResponseEntity<Map<String, Object>> geocode(@RequestParam String address) {
-        return ResponseEntity.ok(googleMapsService.geocode(address));
+    @GetMapping("/config")
+    public ResponseEntity<MapConfigResponse> config() {
+        String template = "https://api.maptiler.com/maps/streets/{z}/{x}/{y}.png?key=" + apiKeysConfig.getMapTilerKey();
+        return ResponseEntity.ok(new MapConfigResponse(template));
     }
 
-    @GetMapping("/reverse-geocode")
-    public ResponseEntity<Map<String, Object>> reverseGeocode(@RequestParam double lat, @RequestParam double lng) {
-        return ResponseEntity.ok(googleMapsService.reverseGeocode(lat, lng));
+    @PostMapping("/directions")
+    public ResponseEntity<DirectionsResponse> directions(@Valid @RequestBody DirectionsRequest request) {
+        return ResponseEntity.ok(openRouteService.getDirections(request));
     }
 
-    @GetMapping("/directions")
-    public ResponseEntity<Map<String, Object>> directions(
-            @RequestParam String origin,
-            @RequestParam String destination
-    ) {
-        return ResponseEntity.ok(googleMapsService.directions(origin, destination));
+    @GetMapping("/routing-stats")
+    public ResponseEntity<RoutingStatsResponse> routingStats() {
+        return ResponseEntity.ok(openRouteService.getStats());
     }
 }
