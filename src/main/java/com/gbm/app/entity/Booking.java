@@ -13,13 +13,20 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 
 import lombok.Getter;
 import lombok.Setter;
 
 @Entity
-@Table(name = "bookings")
+@Table(
+    name = "bookings",
+    indexes = {
+        @Index(name = "idx_bookings_mechanic_id", columnList = "mechanic_id"),
+        @Index(name = "idx_bookings_owner_id", columnList = "owner_id")
+    }
+)
 @Getter
 @Setter
 public class Booking {

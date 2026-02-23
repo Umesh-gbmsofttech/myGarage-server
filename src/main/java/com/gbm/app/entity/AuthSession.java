@@ -10,13 +10,19 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 
 import lombok.Getter;
 import lombok.Setter;
 
 @Entity
-@Table(name = "auth_sessions")
+@Table(
+    name = "auth_sessions",
+    indexes = {
+        @Index(name = "idx_auth_sessions_token", columnList = "token")
+    }
+)
 @Getter
 @Setter
 public class AuthSession {

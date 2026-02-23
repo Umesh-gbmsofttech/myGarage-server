@@ -18,7 +18,7 @@ public class BannerStorageService {
 
     private final Path uploadDir;
 
-    public BannerStorageService(@Value("${app.upload.dir}") String uploadDir) throws IOException {
+    public BannerStorageService(@Value("${app.banner.upload.dir}") String uploadDir) throws IOException {
         this.uploadDir = Paths.get(uploadDir).toAbsolutePath().normalize();
         Files.createDirectories(this.uploadDir);
     }
@@ -33,7 +33,7 @@ public class BannerStorageService {
 
         try {
             Thumbnails.of(file.getInputStream())
-                .size(1200, 600)
+                .size(1280, 720)
                 .outputQuality(0.8)
                 .outputFormat(ext.isBlank() ? "jpg" : ext)
                 .toFile(target.toFile());

@@ -22,12 +22,12 @@ public class ApiKeysConfig {
         return openAi;
     }
 
-    public String getOpenRouteServiceKey() {
-        return openRouteService;
-    }
-
     public String getMapTilerKey() {
         return map.getTiler();
+    }
+
+    public String getOpenRouteServiceKey() {
+        return openRouteService;
     }
 
     public String getOpenAi() {

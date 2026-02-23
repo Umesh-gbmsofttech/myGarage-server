@@ -1,5 +1,6 @@
 package com.gbm.app.dto;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
@@ -7,14 +8,18 @@ import lombok.Data;
 public class DirectionsRequest {
 
     @NotNull
-    private Double originLat;
+    @JsonAlias("originLat")
+    private Double fromLat;
 
     @NotNull
-    private Double originLng;
+    @JsonAlias("originLng")
+    private Double fromLng;
 
     @NotNull
-    private Double destinationLat;
+    @JsonAlias("destinationLat")
+    private Double toLat;
 
     @NotNull
-    private Double destinationLng;
+    @JsonAlias("destinationLng")
+    private Double toLng;
 }

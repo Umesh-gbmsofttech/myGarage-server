@@ -6,7 +6,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.gbm.app.dto.AdminSettingsRequest;
-import com.gbm.app.dto.BannerRequest;
 import com.gbm.app.entity.AdminSettings;
 import com.gbm.app.entity.Banner;
 import com.gbm.app.entity.MechanicProfile;
@@ -27,27 +26,6 @@ public class AdminService {
 
     public List<Banner> listBanners() {
         return bannerRepository.findAll();
-    }
-
-    public Banner createBanner(BannerRequest request) {
-        Banner banner = new Banner();
-        banner.setImageUrl(request.getImageUrl());
-        if (request.getActive() != null) {
-            banner.setActive(request.getActive());
-        }
-        return bannerRepository.save(banner);
-    }
-
-    public Banner updateBanner(Long id, BannerRequest request) {
-        Banner banner = bannerRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Banner not found"));
-        if (request.getImageUrl() != null) {
-            banner.setImageUrl(request.getImageUrl());
-        }
-        if (request.getActive() != null) {
-            banner.setActive(request.getActive());
-        }
-        return bannerRepository.save(banner);
     }
 
     public void deleteBanner(Long id) {

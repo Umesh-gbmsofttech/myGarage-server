@@ -11,8 +11,8 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.gbm.app.dto.LiveLocationDTO;
 import com.gbm.app.dto.LocationUpdateRequest;
-import com.gbm.app.entity.LiveLocation;
 import com.gbm.app.entity.User;
 import com.gbm.app.service.AuthService;
 import com.gbm.app.service.LocationService;
@@ -28,14 +28,14 @@ public class LocationController {
     private final LocationService locationService;
 
     @PostMapping("/bookings/{id}")
-    public ResponseEntity<LiveLocation> update(@RequestHeader("Authorization") String authorization,
+    public ResponseEntity<LiveLocationDTO> update(@RequestHeader("Authorization") String authorization,
             @PathVariable Long id, @RequestBody LocationUpdateRequest request) {
         User user = authService.requireUser(authorization);
         return ResponseEntity.ok(locationService.updateLocation(user, id, request));
     }
 
     @GetMapping("/bookings/{id}")
-    public ResponseEntity<List<LiveLocation>> list(@RequestHeader("Authorization") String authorization,
+    public ResponseEntity<List<LiveLocationDTO>> list(@RequestHeader("Authorization") String authorization,
             @PathVariable Long id) {
         User user = authService.requireUser(authorization);
         return ResponseEntity.ok(locationService.getLocations(user, id));

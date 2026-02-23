@@ -4,7 +4,9 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import com.gbm.app.dto.BookingSummaryDTO;
 import com.gbm.app.dto.BookingRequest;
 import com.gbm.app.dto.BookingRespondRequest;
 import com.gbm.app.dto.BookingResponse;
@@ -75,16 +77,30 @@ public class BookingService {
         return toResponse(saved);
     }
 
+    @Transactional(readOnly = true)
     public List<BookingResponse> listForOwner(User owner) {
         return bookingRepository.findByOwnerId(owner.getId()).stream()
             .map(this::toResponse)
             .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public List<BookingResponse> listForMechanic(User mechanic) {
         return bookingRepository.findByMechanicId(mechanic.getId()).stream()
             .map(this::toResponse)
             .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public BookingSummaryDTO getBookingSummary(User user, Long bookingId) {
+        if (!bookingRepository.existsById(bookingId)) {
+            throw new IllegalArgumentException("Booking not found");
+        }
+        if (!bookingRepository.isUserInBooking(bookingId, user.getId())) {
+            throw new IllegalArgumentException("Unauthorized");
+        }
+        return bookingRepository.findSummaryById(bookingId)
+            .orElseThrow(() -> new IllegalArgumentException("Booking not found"));
     }
 
     public BookingResponse updateStatus(User user, Long bookingId, BookingStatus status) {
