@@ -1,12 +1,15 @@
 package com.gbm.app.service;
 
 import java.time.Instant;
+import java.time.Duration;
 import java.time.temporal.ChronoUnit;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.UUID;
 
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,11 +34,13 @@ import lombok.RequiredArgsConstructor;
 public class AuthService {
 
     private static final Logger log = LoggerFactory.getLogger(AuthService.class);
+    private static final long TOKEN_CACHE_TTL_MS = 60_000L;
     private final UserRepository userRepository;
     private final AuthSessionRepository authSessionRepository;
     private final MechanicProfileRepository mechanicProfileRepository;
     private final VehicleOwnerProfileRepository vehicleOwnerProfileRepository;
     private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+    private final ConcurrentHashMap<String, CachedUserEntry> tokenUserCache = new ConcurrentHashMap<>();
 
     public AuthResponse signupMechanic(SignupMechanicRequest request) {
         log.info("Signup mechanic request: mechName={}, surname={}, email={}, mobile={}, city={}, speciality={}, experience={}, shopAct={}",
@@ -108,16 +113,28 @@ public class AuthService {
         return buildAuthResponse(user, session);
     }
 
+    @Transactional(readOnly = true)
     public User requireUser(String authorizationHeader) {
         String token = resolveToken(authorizationHeader);
         if (token == null) {
             throw new IllegalArgumentException("Missing token");
         }
+
+        Instant now = Instant.now();
+        CachedUserEntry cached = tokenUserCache.get(token);
+        if (cached != null) {
+            if (cached.cacheExpiresAt.isAfter(now) && cached.sessionExpiresAt.isAfter(now)) {
+                return cached.user;
+            }
+            tokenUserCache.remove(token, cached);
+        }
+
         AuthSession session = authSessionRepository.findByToken(token)
             .orElseThrow(() -> new IllegalArgumentException("Invalid token"));
-        if (session.getExpiresAt().isBefore(Instant.now())) {
+        if (session.getExpiresAt().isBefore(now)) {
             throw new IllegalArgumentException("Token expired");
         }
+        cacheTokenUser(token, session.getUser(), session.getExpiresAt(), now);
         return session.getUser();
     }
 
@@ -126,7 +143,9 @@ public class AuthService {
         session.setUser(user);
         session.setToken(UUID.randomUUID().toString());
         session.setExpiresAt(Instant.now().plus(7, ChronoUnit.DAYS));
-        return authSessionRepository.save(session);
+        AuthSession saved = authSessionRepository.save(session);
+        cacheTokenUser(saved.getToken(), user, saved.getExpiresAt(), Instant.now());
+        return saved;
     }
 
     private AuthResponse buildAuthResponse(User user, AuthSession session) {
@@ -181,8 +200,28 @@ public class AuthService {
             return null;
         }
         if (header.toLowerCase().startsWith("bearer ")) {
-            return header.substring(7);
+            return header.substring(7).trim();
         }
-        return header;
+        return header.trim();
+    }
+
+    private void cacheTokenUser(String token, User user, Instant sessionExpiresAt, Instant now) {
+        long ttlMs = Math.min(TOKEN_CACHE_TTL_MS, Math.max(0L, Duration.between(now, sessionExpiresAt).toMillis()));
+        if (ttlMs <= 0L) {
+            return;
+        }
+        tokenUserCache.put(token, new CachedUserEntry(user, sessionExpiresAt, now.plusMillis(ttlMs)));
+    }
+
+    private static class CachedUserEntry {
+        private final User user;
+        private final Instant sessionExpiresAt;
+        private final Instant cacheExpiresAt;
+
+        private CachedUserEntry(User user, Instant sessionExpiresAt, Instant cacheExpiresAt) {
+            this.user = user;
+            this.sessionExpiresAt = sessionExpiresAt;
+            this.cacheExpiresAt = cacheExpiresAt;
+        }
     }
 }

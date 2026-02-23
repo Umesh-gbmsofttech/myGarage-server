@@ -11,7 +11,7 @@ public class WebConfig implements WebMvcConfigurer {
     private final String uploadDir;
     private final String profileUploadDir;
 
-    public WebConfig(@Value("${app.upload.dir}") String uploadDir,
+    public WebConfig(@Value("${app.banner.upload.dir}") String uploadDir,
             @Value("${app.profile.upload.dir}") String profileUploadDir) {
         this.uploadDir = uploadDir;
         this.profileUploadDir = profileUploadDir;

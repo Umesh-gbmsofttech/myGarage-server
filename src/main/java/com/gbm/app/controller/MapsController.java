@@ -5,7 +5,7 @@ import com.gbm.app.dto.DirectionsRequest;
 import com.gbm.app.dto.DirectionsResponse;
 import com.gbm.app.dto.MapConfigResponse;
 import com.gbm.app.dto.RoutingStatsResponse;
-import com.gbm.app.service.OpenRouteService;
+import com.gbm.app.service.OsrmRoutingService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,11 +18,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/maps")
 public class MapsController {
 
-    private final OpenRouteService openRouteService;
+    private final OsrmRoutingService osrmRoutingService;
     private final ApiKeysConfig apiKeysConfig;
 
-    public MapsController(OpenRouteService openRouteService, ApiKeysConfig apiKeysConfig) {
-        this.openRouteService = openRouteService;
+    public MapsController(OsrmRoutingService osrmRoutingService, ApiKeysConfig apiKeysConfig) {
+        this.osrmRoutingService = osrmRoutingService;
         this.apiKeysConfig = apiKeysConfig;
     }
 
@@ -34,11 +34,11 @@ public class MapsController {
 
     @PostMapping("/directions")
     public ResponseEntity<DirectionsResponse> directions(@Valid @RequestBody DirectionsRequest request) {
-        return ResponseEntity.ok(openRouteService.getDirections(request));
+        return ResponseEntity.ok(osrmRoutingService.getDirections(request));
     }
 
     @GetMapping("/routing-stats")
     public ResponseEntity<RoutingStatsResponse> routingStats() {
-        return ResponseEntity.ok(openRouteService.getStats());
+        return ResponseEntity.ok(osrmRoutingService.getStats());
     }
 }

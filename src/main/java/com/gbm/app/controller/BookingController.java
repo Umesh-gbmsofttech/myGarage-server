@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.gbm.app.dto.BookingRequest;
 import com.gbm.app.dto.BookingRespondRequest;
 import com.gbm.app.dto.BookingResponse;
+import com.gbm.app.dto.BookingSummaryDTO;
 import com.gbm.app.dto.OtpCodeRequest;
 import com.gbm.app.entity.User;
 import com.gbm.app.service.AuthService;
@@ -74,5 +75,12 @@ public class BookingController {
     public ResponseEntity<List<BookingResponse>> mechanicBookings(@RequestHeader("Authorization") String authorization) {
         User mechanic = authService.requireUser(authorization);
         return ResponseEntity.ok(bookingService.listForMechanic(mechanic));
+    }
+
+    @GetMapping("/{id}/summary")
+    public ResponseEntity<BookingSummaryDTO> bookingSummary(@RequestHeader("Authorization") String authorization,
+            @PathVariable Long id) {
+        User user = authService.requireUser(authorization);
+        return ResponseEntity.ok(bookingService.getBookingSummary(user, id));
     }
 }

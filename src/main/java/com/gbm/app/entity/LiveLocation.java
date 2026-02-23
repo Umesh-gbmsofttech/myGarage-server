@@ -10,13 +10,20 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 
 import lombok.Getter;
 import lombok.Setter;
 
 @Entity
-@Table(name = "live_locations")
+@Table(
+    name = "live_locations",
+    indexes = {
+        @Index(name = "idx_live_locations_booking_id", columnList = "booking_id"),
+        @Index(name = "idx_live_locations_user_id", columnList = "user_id")
+    }
+)
 @Getter
 @Setter
 public class LiveLocation {
