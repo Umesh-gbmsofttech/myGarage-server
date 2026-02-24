@@ -16,8 +16,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.gbm.app.dto.AdminSettingsRequest;
+import com.gbm.app.dto.BannerResponse;
 import com.gbm.app.entity.AdminSettings;
-import com.gbm.app.entity.Banner;
 import com.gbm.app.entity.MechanicProfile;
 import com.gbm.app.service.AdminService;
 
@@ -42,12 +42,12 @@ public class AdminController {
     }
 
     @GetMapping("/banners")
-    public ResponseEntity<List<Banner>> listBanners() {
+    public ResponseEntity<List<BannerResponse>> listBanners() {
         return ResponseEntity.ok(adminService.listBanners());
     }
 
     @PostMapping("/banners/upload")
-    public ResponseEntity<Banner> uploadBanner(@RequestParam("file") MultipartFile file) {
+    public ResponseEntity<BannerResponse> uploadBanner(@RequestParam("file") MultipartFile file) {
         return ResponseEntity.ok(adminService.uploadBanner(file));
     }
 

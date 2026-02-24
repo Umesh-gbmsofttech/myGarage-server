@@ -1,6 +1,7 @@
 package com.gbm.app.service;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.gbm.app.dto.UpdateProfileRequest;
 import com.gbm.app.dto.UserProfileResponse;
@@ -24,8 +25,10 @@ public class ProfileService {
     private final MechanicProfileRepository mechanicProfileRepository;
     private final VehicleOwnerProfileRepository vehicleOwnerProfileRepository;
     private final AdminSettingsRepository adminSettingsRepository;
-    private final ProfileImageStorageService profileImageStorageService;
+    private final ImageService imageService;
+    private final ImageUrlService imageUrlService;
 
+    @Transactional(readOnly = true)
     public UserProfileResponse getProfile(User user) {
         UserProfileResponse response = new UserProfileResponse();
         response.setUserId(user.getId());
@@ -46,7 +49,7 @@ public class ProfileService {
                 response.setRating(profile.getRating());
                 response.setRatingCount(profile.getRatingCount());
                 response.setVisible(profile.isVisible());
-                response.setProfileImageUrl(profile.getProfileImageUrl());
+                response.setProfileImageUrl(imageUrlService.toImageUrl(profile.getProfileImageId()));
                 response.setExpertise(profile.getExpertise());
                 response.setAbout(profile.getAbout());
             }
@@ -57,7 +60,7 @@ public class ProfileService {
             if (profile != null) {
                 response.setCity(profile.getCity());
                 response.setAddressLine(profile.getAddressLine());
-                response.setAvatarUrl(profile.getAvatarUrl());
+                response.setAvatarUrl(imageUrlService.toImageUrl(profile.getAvatarImageId()));
             }
         }
 
@@ -72,6 +75,7 @@ public class ProfileService {
         return response;
     }
 
+    @Transactional
     public UserProfileResponse updateProfile(User user, UpdateProfileRequest request) {
         if (request.getFirstName() != null) {
             user.setFirstName(request.getFirstName());
@@ -99,9 +103,6 @@ public class ProfileService {
             if (request.getShopActive() != null) {
                 profile.setShopActive(request.getShopActive());
             }
-            if (request.getProfileImageUrl() != null) {
-                profile.setProfileImageUrl(request.getProfileImageUrl());
-            }
             if (request.getExpertise() != null) {
                 profile.setExpertise(request.getExpertise());
             }
@@ -120,26 +121,25 @@ public class ProfileService {
             if (request.getAddressLine() != null) {
                 profile.setAddressLine(request.getAddressLine());
             }
-            if (request.getAvatarUrl() != null) {
-                profile.setAvatarUrl(request.getAvatarUrl());
-            }
             vehicleOwnerProfileRepository.save(profile);
         }
 
         return getProfile(user);
     }
 
+    @Transactional
     public UserProfileResponse uploadProfileImage(User user, org.springframework.web.multipart.MultipartFile file) {
-        String url = profileImageStorageService.store(file);
         if (user.getRole() == Role.MECHANIC) {
             MechanicProfile profile = mechanicProfileRepository.findByUserId(user.getId())
                 .orElseThrow(() -> new IllegalArgumentException("Mechanic profile missing"));
-            profile.setProfileImageUrl(url);
+            Long imageId = imageService.upsertImageId(profile.getProfileImageId(), file, "PROFILE", user.getId());
+            profile.setProfileImageId(imageId);
             mechanicProfileRepository.save(profile);
         } else if (user.getRole() == Role.VEHICLE_OWNER) {
             VehicleOwnerProfile profile = vehicleOwnerProfileRepository.findByUserId(user.getId())
                 .orElseThrow(() -> new IllegalArgumentException("Owner profile missing"));
-            profile.setAvatarUrl(url);
+            Long imageId = imageService.upsertImageId(profile.getAvatarImageId(), file, "PROFILE", user.getId());
+            profile.setAvatarImageId(imageId);
             vehicleOwnerProfileRepository.save(profile);
         }
         return getProfile(user);

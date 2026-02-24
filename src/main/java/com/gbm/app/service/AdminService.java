@@ -1,11 +1,14 @@
 package com.gbm.app.service;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.gbm.app.dto.AdminSettingsRequest;
+import com.gbm.app.dto.BannerResponse;
 import com.gbm.app.entity.AdminSettings;
 import com.gbm.app.entity.Banner;
 import com.gbm.app.entity.MechanicProfile;
@@ -22,25 +25,30 @@ public class AdminService {
     private final BannerRepository bannerRepository;
     private final AdminSettingsRepository adminSettingsRepository;
     private final MechanicProfileRepository mechanicProfileRepository;
-    private final BannerStorageService bannerStorageService;
+    private final ImageService imageService;
+    private final ImageUrlService imageUrlService;
 
-    public List<Banner> listBanners() {
-        return bannerRepository.findAll();
+    @Transactional(readOnly = true)
+    public List<BannerResponse> listBanners() {
+        return bannerRepository.findAll().stream().map(this::toBannerResponse).collect(Collectors.toList());
     }
 
+    @Transactional
     public void deleteBanner(Long id) {
         Banner banner = bannerRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Banner not found"));
+        imageService.deleteIfPresent(banner.getImageId());
         bannerRepository.delete(banner);
-        bannerStorageService.delete(banner.getImageUrl());
     }
 
-    public Banner uploadBanner(MultipartFile file) {
-        String url = bannerStorageService.store(file);
+    @Transactional
+    public BannerResponse uploadBanner(MultipartFile file) {
         Banner banner = new Banner();
-        banner.setImageUrl(url);
         banner.setActive(true);
-        return bannerRepository.save(banner);
+        Banner savedBanner = bannerRepository.save(banner);
+        Long imageId = imageService.upload(file, "BANNER", savedBanner.getId()).getId();
+        savedBanner.setImageId(imageId);
+        return toBannerResponse(bannerRepository.save(savedBanner));
     }
 
     public AdminSettings getSettings() {
@@ -63,5 +71,14 @@ public class AdminService {
                 .orElseThrow(() -> new IllegalArgumentException("Mechanic profile not found"));
         profile.setVisible(visible);
         return mechanicProfileRepository.save(profile);
+    }
+
+    private BannerResponse toBannerResponse(Banner banner) {
+        BannerResponse response = new BannerResponse();
+        response.setId(banner.getId());
+        response.setImageId(banner.getImageId());
+        response.setImageUrl(imageUrlService.toImageUrl(banner.getImageId()));
+        response.setActive(banner.isActive());
+        return response;
     }
 }

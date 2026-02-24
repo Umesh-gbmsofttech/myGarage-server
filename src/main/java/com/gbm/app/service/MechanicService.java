@@ -6,6 +6,7 @@ import java.util.Random;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.gbm.app.dto.MechanicCardResponse;
 import com.gbm.app.entity.MechanicProfile;
@@ -19,8 +20,10 @@ import lombok.RequiredArgsConstructor;
 public class MechanicService {
 
     private final MechanicProfileRepository mechanicProfileRepository;
+    private final ImageUrlService imageUrlService;
     private final Random random = new Random();
 
+    @Transactional(readOnly = true)
     public List<MechanicCardResponse> topRated(int limit) {
         return mechanicProfileRepository.findByVisibleTrue().stream()
             .sorted(Comparator.comparing(MechanicProfile::getRating, Comparator.nullsLast(Double::compareTo)).reversed())
@@ -29,6 +32,7 @@ public class MechanicService {
             .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public List<MechanicCardResponse> random(int limit) {
         List<MechanicProfile> profiles = mechanicProfileRepository.findByVisibleTrue();
         return profiles.stream()
@@ -38,6 +42,7 @@ public class MechanicService {
             .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public List<MechanicCardResponse> search(String query, Double lat, Double lng, double radiusKm) {
         String safeQuery = query == null ? "" : query.toLowerCase();
         return mechanicProfileRepository.findByVisibleTrue().stream()
@@ -81,7 +86,7 @@ public class MechanicService {
         card.setRating(profile.getRating());
         card.setRatingCount(profile.getRatingCount());
         card.setCity(profile.getCity());
-        card.setProfileImageUrl(profile.getProfileImageUrl());
+        card.setProfileImageUrl(imageUrlService.toImageUrl(profile.getProfileImageId()));
         return card;
     }
 }

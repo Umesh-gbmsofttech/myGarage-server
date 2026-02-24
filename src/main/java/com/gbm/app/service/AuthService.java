@@ -6,7 +6,6 @@ import java.time.temporal.ChronoUnit;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.UUID;
 
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,7 +38,7 @@ public class AuthService {
     private final AuthSessionRepository authSessionRepository;
     private final MechanicProfileRepository mechanicProfileRepository;
     private final VehicleOwnerProfileRepository vehicleOwnerProfileRepository;
-    private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+    private final PasswordEncoder passwordEncoder;
     private final ConcurrentHashMap<String, CachedUserEntry> tokenUserCache = new ConcurrentHashMap<>();
 
     public AuthResponse signupMechanic(SignupMechanicRequest request) {
