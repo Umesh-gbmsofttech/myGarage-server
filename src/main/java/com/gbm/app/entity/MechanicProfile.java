@@ -8,13 +8,17 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToOne;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 
 import lombok.Getter;
 import lombok.Setter;
 
 @Entity
-@Table(name = "mechanic_profiles")
+@Table(name = "mechanic_profiles", indexes = {
+    @Index(name = "idx_mechanic_profiles_user_id", columnList = "user_id"),
+    @Index(name = "idx_mechanic_profiles_profile_image_id", columnList = "profileImageId")
+})
 @Getter
 @Setter
 public class MechanicProfile {
@@ -47,7 +51,7 @@ public class MechanicProfile {
     @Column(nullable = false)
     private boolean visible = true;
 
-    private String profileImageUrl;
+    private Long profileImageId;
 
     private String expertise;
 

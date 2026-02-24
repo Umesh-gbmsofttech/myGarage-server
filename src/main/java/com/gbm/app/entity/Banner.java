@@ -4,13 +4,16 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 
 import lombok.Getter;
 import lombok.Setter;
 
 @Entity
-@Table(name = "banners")
+@Table(name = "banners", indexes = {
+        @Index(name = "idx_banners_image_id", columnList = "imageId")
+})
 @Getter
 @Setter
 public class Banner {
@@ -19,7 +22,7 @@ public class Banner {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String imageUrl;
+    private Long imageId;
 
     private boolean active = true;
 }
