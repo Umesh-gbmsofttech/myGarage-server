@@ -12,6 +12,7 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -19,6 +20,9 @@ import lombok.Setter;
 @Entity
 @Table(
     name = "live_locations",
+    uniqueConstraints = {
+        @UniqueConstraint(name = "uk_live_locations_booking_user", columnNames = { "booking_id", "user_id" })
+    },
     indexes = {
         @Index(name = "idx_live_locations_booking_id", columnList = "booking_id"),
         @Index(name = "idx_live_locations_user_id", columnList = "user_id")

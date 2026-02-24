@@ -5,12 +5,14 @@ import lombok.Data;
 
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Map;
 
 @Data
 public class DirectionsResponse {
 
     private List<RoutePoint> route;
     private List<List<Double>> geometry;
+    private Map<String, Object> geoJson;
     private double distanceMeters;
     private double durationSeconds;
     private long etaSeconds;
@@ -21,6 +23,7 @@ public class DirectionsResponse {
             String etaText, List<RouteStep> steps) {
         this.route = route;
         this.geometry = toGeometry(route);
+        this.geoJson = Map.of("type", "LineString", "coordinates", this.geometry);
         this.distanceMeters = distanceMeters;
         this.durationSeconds = durationSeconds;
         this.etaSeconds = etaSeconds;
