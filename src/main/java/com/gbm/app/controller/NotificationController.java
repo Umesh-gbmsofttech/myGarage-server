@@ -37,4 +37,11 @@ public class NotificationController {
         User user = authService.requireUser(authorization);
         return ResponseEntity.ok(notificationService.markRead(user, id));
     }
+
+    @PostMapping("/read-all")
+    public ResponseEntity<Void> markAllRead(@RequestHeader("Authorization") String authorization) {
+        User user = authService.requireUser(authorization);
+        notificationService.markAllRead(user);
+        return ResponseEntity.noContent().build();
+    }
 }
