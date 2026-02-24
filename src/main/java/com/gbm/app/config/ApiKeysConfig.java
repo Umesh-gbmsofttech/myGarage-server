@@ -12,9 +12,6 @@ public class ApiKeysConfig {
     @NotBlank
     private String openAi;
 
-    @NotBlank
-    private String openRouteService;
-
     @Valid
     private MapConfig map = new MapConfig();
 
@@ -26,24 +23,12 @@ public class ApiKeysConfig {
         return map.getTiler();
     }
 
-    public String getOpenRouteServiceKey() {
-        return openRouteService;
-    }
-
     public String getOpenAi() {
         return openAi;
     }
 
     public void setOpenAi(String openAi) {
         this.openAi = openAi;
-    }
-
-    public String getOpenRouteService() {
-        return openRouteService;
-    }
-
-    public void setOpenRouteService(String openRouteService) {
-        this.openRouteService = openRouteService;
     }
 
     public MapConfig getMap() {
