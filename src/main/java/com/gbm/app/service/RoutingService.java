@@ -84,9 +84,19 @@ public class RoutingService {
             long elapsedMs = System.currentTimeMillis() - startedAt;
             logger.info("Routing provider response provider=osrm status={} elapsedMs={}", response.getStatusCode().value(), elapsedMs);
             return parseOsrmDirections(response.getBody());
-        } catch (ResourceAccessException | HttpStatusCodeException ex) {
+        } catch (HttpStatusCodeException ex) {
             long elapsedMs = System.currentTimeMillis() - startedAt;
-            logger.error("Routing failed provider=osrm elapsedMs={} message={}", elapsedMs, ex.getMessage(), ex);
+            logger.error(
+                    "Routing failed provider=osrm elapsedMs={} upstreamStatus={} responseBody={}",
+                    elapsedMs,
+                    ex.getStatusCode().value(),
+                    ex.getResponseBodyAsString(),
+                    ex
+            );
+            throw new UpstreamServiceException(HttpStatus.BAD_GATEWAY, "Routing provider unavailable");
+        } catch (ResourceAccessException ex) {
+            long elapsedMs = System.currentTimeMillis() - startedAt;
+            logger.error("Routing timeout/network failure provider=osrm elapsedMs={} message={}", elapsedMs, ex.getMessage(), ex);
             throw new UpstreamServiceException(HttpStatus.BAD_GATEWAY, "Routing provider unavailable");
         } catch (UpstreamServiceException ex) {
             long elapsedMs = System.currentTimeMillis() - startedAt;
@@ -101,12 +111,14 @@ public class RoutingService {
 
     private DirectionsResponse parseOsrmDirections(String body) {
         if (body == null || body.isBlank()) {
+            logger.error("Routing parse failed provider=osrm reason=empty_body");
             throw new UpstreamServiceException(HttpStatus.BAD_GATEWAY, "Routing provider unavailable");
         }
         try {
             JsonNode root = objectMapper.readTree(body);
             JsonNode routes = root.path("routes");
             if (!routes.isArray() || routes.isEmpty()) {
+                logger.error("Routing parse failed provider=osrm reason=no_routes");
                 throw new UpstreamServiceException(HttpStatus.BAD_GATEWAY, "Routing provider unavailable");
             }
 
@@ -114,6 +126,7 @@ public class RoutingService {
             JsonNode coordinates = firstRoute.path("geometry").path("coordinates");
             List<DirectionsResponse.RoutePoint> routePoints = parseCoordinates(coordinates);
             if (routePoints.size() < 2) {
+                logger.error("Routing parse failed provider=osrm reason=insufficient_geometry");
                 throw new UpstreamServiceException(HttpStatus.BAD_GATEWAY, "Routing provider unavailable");
             }
 
@@ -133,6 +146,7 @@ public class RoutingService {
         } catch (UpstreamServiceException ex) {
             throw ex;
         } catch (Exception ex) {
+            logger.error("Routing parse failed provider=osrm reason=unexpected message={}", ex.getMessage(), ex);
             throw new UpstreamServiceException(HttpStatus.BAD_GATEWAY, "Routing provider unavailable");
         }
     }

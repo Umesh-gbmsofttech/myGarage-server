@@ -3,6 +3,8 @@ package com.gbm.app.service;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.List;
 import java.util.Locale;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +24,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class LocationService {
 
+    private static final Logger logger = LoggerFactory.getLogger(LocationService.class);
     private static final long LIVE_LOCATION_CACHE_TTL_MS = 1_000L;
     private final LiveLocationRepository liveLocationRepository;
     private final BookingRepository bookingRepository;
@@ -36,14 +39,25 @@ public class LocationService {
             throw new IllegalArgumentException("Unauthorized");
         }
 
-        LiveLocation location = liveLocationRepository.findByBookingIdAndUserId(bookingId, user.getId())
-            .orElseGet(() -> {
-                LiveLocation created = new LiveLocation();
-                Booking bookingRef = bookingRepository.getReferenceById(bookingId);
-                created.setBooking(bookingRef);
-                created.setUser(user);
-                return created;
-            });
+        List<LiveLocation> existingLocations = liveLocationRepository.findByBookingIdAndUserId(bookingId, user.getId());
+        LiveLocation location;
+        if (existingLocations.isEmpty()) {
+            location = new LiveLocation();
+            Booking bookingRef = bookingRepository.getReferenceById(bookingId);
+            location.setBooking(bookingRef);
+            location.setUser(user);
+        } else {
+            location = existingLocations.get(0);
+            if (existingLocations.size() > 1) {
+                logger.warn(
+                    "Duplicate live location rows found for bookingId={} userId={} count={}. Keeping id={}",
+                    bookingId,
+                    user.getId(),
+                    existingLocations.size(),
+                    location.getId()
+                );
+            }
+        }
 
         location.setLatitude(request.getLatitude());
         location.setLongitude(request.getLongitude());
