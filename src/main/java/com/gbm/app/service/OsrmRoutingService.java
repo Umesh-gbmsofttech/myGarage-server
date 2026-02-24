@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -27,6 +28,7 @@ import java.util.concurrent.atomic.AtomicLong;
 public class OsrmRoutingService {
 
     private static final String ORS_DIRECTIONS_URL = "https://api.openrouteservice.org/v2/directions/driving-car";
+    private static final String PUBLIC_OSRM_URL = "https://router.project-osrm.org/route/v1/driving/";
     private static final long CACHE_TTL_MS = 5 * 60 * 1000L;
 
     private final ApiKeysConfig apiKeysConfig;
@@ -57,12 +59,24 @@ public class OsrmRoutingService {
             return cached;
         }
 
-        DirectionsResponse fresh = fetchRouteFromOsrm(request);
+        DirectionsResponse fresh = fetchRouteWithFallback(request);
         routeCache.put(cacheKey, new CacheEntry(fresh, System.currentTimeMillis() + CACHE_TTL_MS));
         return fresh;
     }
 
-    private DirectionsResponse fetchRouteFromOsrm(DirectionsRequest request) {
+    private DirectionsResponse fetchRouteWithFallback(DirectionsRequest request) {
+        try {
+            return fetchRouteFromOpenRouteService(request);
+        } catch (UpstreamServiceException ex) {
+            try {
+                return fetchRouteFromPublicOsrm(request);
+            } catch (UpstreamServiceException fallbackEx) {
+                throw ex;
+            }
+        }
+    }
+
+    private DirectionsResponse fetchRouteFromOpenRouteService(DirectionsRequest request) {
         String start = String.format(
                 Locale.US,
                 "%.6f,%.6f",
@@ -75,11 +89,14 @@ public class OsrmRoutingService {
                 request.getToLng(),
                 request.getToLat()
         );
-        String url = ORS_DIRECTIONS_URL
-                + "?api_key=" + apiKeysConfig.getOpenRouteServiceKey()
-                + "&start=" + start
-                + "&end=" + end
-                + "&instructions=true";
+        String url = UriComponentsBuilder.fromHttpUrl(ORS_DIRECTIONS_URL)
+                .queryParam("api_key", apiKeysConfig.getOpenRouteServiceKey())
+                .queryParam("start", start)
+                .queryParam("end", end)
+                .queryParam("instructions", true)
+                .build()
+                .encode()
+                .toUriString();
 
         try {
             outboundRequests.incrementAndGet();
@@ -89,9 +106,27 @@ public class OsrmRoutingService {
             if (isTimeout(ex)) {
                 throw new UpstreamServiceException(HttpStatus.GATEWAY_TIMEOUT, "Routing provider timeout.");
             }
-            throw new UpstreamServiceException(HttpStatus.BAD_GATEWAY, "Routing provider unavailable.");
+            throw new UpstreamServiceException(HttpStatus.BAD_GATEWAY, "Routing provider unavailable: " + safeMessage(ex.getMessage()));
         } catch (HttpStatusCodeException ex) {
-            throw new UpstreamServiceException(HttpStatus.BAD_GATEWAY, "Routing provider error.");
+            throw new UpstreamServiceException(HttpStatus.BAD_GATEWAY, "Routing provider error: " + extractUpstreamError(ex));
+        }
+    }
+
+    private DirectionsResponse fetchRouteFromPublicOsrm(DirectionsRequest request) {
+        String start = String.format(Locale.US, "%.6f,%.6f", request.getFromLng(), request.getFromLat());
+        String end = String.format(Locale.US, "%.6f,%.6f", request.getToLng(), request.getToLat());
+        String url = PUBLIC_OSRM_URL + start + ";" + end + "?overview=full&geometries=geojson";
+        try {
+            outboundRequests.incrementAndGet();
+            ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
+            return parseOsrmDirections(response.getBody());
+        } catch (ResourceAccessException ex) {
+            if (isTimeout(ex)) {
+                throw new UpstreamServiceException(HttpStatus.GATEWAY_TIMEOUT, "Routing provider timeout.");
+            }
+            throw new UpstreamServiceException(HttpStatus.BAD_GATEWAY, "Routing provider unavailable: " + safeMessage(ex.getMessage()));
+        } catch (HttpStatusCodeException ex) {
+            throw new UpstreamServiceException(HttpStatus.BAD_GATEWAY, "Routing provider error: " + extractUpstreamError(ex));
         }
     }
 
@@ -126,6 +161,32 @@ public class OsrmRoutingService {
             double durationSeconds = summary.path("duration").asDouble(0);
             List<DirectionsResponse.RouteStep> steps = parseSteps(feature.path("properties").path("segments"));
             return toResponse(routePoints, distanceMeters, durationSeconds, steps);
+        } catch (UpstreamServiceException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new UpstreamServiceException(HttpStatus.BAD_GATEWAY, "Invalid routing response.");
+        }
+    }
+
+    private DirectionsResponse parseOsrmDirections(String body) {
+        if (body == null || body.isBlank()) {
+            throw new UpstreamServiceException(HttpStatus.BAD_GATEWAY, "Invalid routing response.");
+        }
+        try {
+            JsonNode root = objectMapper.readTree(body);
+            JsonNode routes = root.path("routes");
+            if (!routes.isArray() || routes.isEmpty()) {
+                throw new UpstreamServiceException(HttpStatus.BAD_GATEWAY, "No route found for the provided coordinates.");
+            }
+            JsonNode firstRoute = routes.path(0);
+            JsonNode coordinates = firstRoute.path("geometry").path("coordinates");
+            List<DirectionsResponse.RoutePoint> routePoints = parseCoordinates(coordinates);
+            if (routePoints.isEmpty()) {
+                throw new UpstreamServiceException(HttpStatus.BAD_GATEWAY, "Invalid routing response.");
+            }
+            double distanceMeters = firstRoute.path("distance").asDouble(0);
+            double durationSeconds = firstRoute.path("duration").asDouble(0);
+            return toResponse(routePoints, distanceMeters, durationSeconds, new ArrayList<>());
         } catch (UpstreamServiceException ex) {
             throw ex;
         } catch (Exception ex) {
@@ -221,6 +282,33 @@ public class OsrmRoutingService {
             return null;
         }
         return entry.response;
+    }
+
+    private String extractUpstreamError(HttpStatusCodeException ex) {
+        String body = ex.getResponseBodyAsString();
+        if (body != null && !body.isBlank()) {
+            try {
+                JsonNode node = objectMapper.readTree(body);
+                String message = node.path("error").asText(null);
+                if (message == null || message.isBlank()) {
+                    message = node.path("message").asText(null);
+                }
+                if (message != null && !message.isBlank()) {
+                    return message;
+                }
+            } catch (Exception ignored) {
+                return body;
+            }
+            return body;
+        }
+        return ex.getStatusCode().toString();
+    }
+
+    private String safeMessage(String message) {
+        if (message == null || message.isBlank()) {
+            return "unknown";
+        }
+        return message;
     }
 
     @Transactional(readOnly = true)

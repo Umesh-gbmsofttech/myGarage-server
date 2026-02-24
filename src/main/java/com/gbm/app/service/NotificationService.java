@@ -5,6 +5,7 @@ import java.util.stream.Collectors;
 
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.gbm.app.dto.NotificationResponse;
 import com.gbm.app.entity.Notification;
@@ -47,6 +48,11 @@ public class NotificationService {
         }
         notification.setRead(true);
         return toResponse(notificationRepository.save(notification));
+    }
+
+    @Transactional
+    public int markAllRead(User user) {
+        return notificationRepository.markAllReadByUserId(user.getId());
     }
 
     private NotificationResponse toResponse(Notification notification) {
