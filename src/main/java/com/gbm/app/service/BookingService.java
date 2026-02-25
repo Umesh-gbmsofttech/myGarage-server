@@ -15,7 +15,9 @@ import com.gbm.app.entity.BookingStatus;
 import com.gbm.app.entity.NotificationType;
 import com.gbm.app.entity.User;
 import com.gbm.app.repository.BookingRepository;
+import com.gbm.app.repository.MechanicProfileRepository;
 import com.gbm.app.repository.UserRepository;
+import com.gbm.app.repository.VehicleOwnerProfileRepository;
 import com.gbm.app.util.OtpUtil;
 
 import lombok.RequiredArgsConstructor;
@@ -27,6 +29,9 @@ public class BookingService {
     private final BookingRepository bookingRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
+    private final MechanicProfileRepository mechanicProfileRepository;
+    private final VehicleOwnerProfileRepository vehicleOwnerProfileRepository;
+    private final ImageUrlService imageUrlService;
 
     public BookingResponse createBooking(User owner, BookingRequest request) {
         User mechanic = userRepository.findById(request.getMechanicId())
@@ -194,6 +199,15 @@ public class BookingService {
         response.setCompleteOtp(booking.getCompleteOtp());
         response.setMeetVerified(booking.isMeetVerified());
         response.setCompleteVerified(booking.isCompleteVerified());
+
+        // Populate Profile Images
+        vehicleOwnerProfileRepository.findByUserId(booking.getOwner().getId()).ifPresent(p -> {
+            response.setOwnerProfileImageUrl(imageUrlService.toImageUrl(p.getAvatarImageId()));
+        });
+        mechanicProfileRepository.findByUserId(booking.getMechanic().getId()).ifPresent(p -> {
+            response.setMechanicProfileImageUrl(imageUrlService.toImageUrl(p.getProfileImageId()));
+        });
+
         response.setCreatedAt(booking.getCreatedAt());
         response.setUpdatedAt(booking.getUpdatedAt());
         return response;

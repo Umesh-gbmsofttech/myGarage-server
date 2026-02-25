@@ -67,17 +67,6 @@ public class LocationService {
     }
 
     @Transactional(readOnly = true)
-    public List<LiveLocationDTO> getLocations(User user, Long bookingId) {
-        if (!bookingRepository.existsById(bookingId)) {
-            throw new IllegalArgumentException("Booking not found");
-        }
-        if (!bookingRepository.isUserInBooking(bookingId, user.getId())) {
-            throw new IllegalArgumentException("Unauthorized");
-        }
-        return liveLocationRepository.findDtosByBookingId(bookingId);
-    }
-
-    @Transactional(readOnly = true)
     public List<LiveLocationPointDTO> getLiveLocationPoints(User user, Long bookingId) {
         if (!bookingRepository.existsById(bookingId)) {
             throw new IllegalArgumentException("Booking not found");

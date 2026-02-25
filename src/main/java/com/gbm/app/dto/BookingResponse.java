@@ -20,6 +20,8 @@ public class BookingResponse {
     private String completeOtp;
     private boolean meetVerified;
     private boolean completeVerified;
+    private String ownerProfileImageUrl;
+    private String mechanicProfileImageUrl;
     private Instant createdAt;
     private Instant updatedAt;
 }
