@@ -30,7 +30,11 @@ public class RoutingService {
     private static final Logger logger = LoggerFactory.getLogger(RoutingService.class);
 
     private static final String PUBLIC_OSRM_URL = "https://router.project-osrm.org/route/v1/driving/";
-    private static final long CACHE_TTL_MS = 5 * 60 * 1000L;
+    private static final String ORS_URL = "https://api.openrouteservice.org/v2/directions/driving-car";
+    private static final long CACHE_TTL_MS = 14 * 60 * 1000L;
+
+    @org.springframework.beans.factory.annotation.Value("${api.keys.ors:}")
+    private String orsKey;
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
@@ -41,8 +45,8 @@ public class RoutingService {
 
     public RoutingService(RestTemplateBuilder restTemplateBuilder, ObjectMapper objectMapper) {
         this.restTemplate = restTemplateBuilder
-                .setConnectTimeout(Duration.ofSeconds(4))
-                .setReadTimeout(Duration.ofSeconds(8))
+                .setConnectTimeout(Duration.ofSeconds(6))
+                .setReadTimeout(Duration.ofSeconds(12))
                 .build();
         this.objectMapper = objectMapper;
     }
@@ -51,8 +55,11 @@ public class RoutingService {
         validateRequest(request);
         inboundRequests.incrementAndGet();
 
+        String provider = (orsKey != null && !orsKey.isBlank()) ? "ors" : "osrm";
+
         logger.info(
-                "Routing request received provider=osrm fromLat={} fromLng={} toLat={} toLng={}",
+                "Routing request received provider={} fromLat={} fromLng={} toLat={} toLng={}",
+                provider,
                 request.getFromLat(),
                 request.getFromLng(),
                 request.getToLat(),
@@ -63,13 +70,77 @@ public class RoutingService {
         DirectionsResponse cached = getCachedRoute(cacheKey);
         if (cached != null) {
             cacheHits.incrementAndGet();
-            logger.info("Routing cache hit provider=osrm key={}", cacheKey);
+            logger.info("Routing cache hit provider={} key={}", provider, cacheKey);
             return cached;
         }
 
-        DirectionsResponse fresh = fetchRouteFromPublicOsrm(request);
+        DirectionsResponse fresh;
+        if ("ors".equals(provider)) {
+            fresh = fetchRouteFromORS(request);
+        } else {
+            fresh = fetchRouteFromPublicOsrm(request);
+        }
+        
         routeCache.put(cacheKey, new CacheEntry(fresh, System.currentTimeMillis() + CACHE_TTL_MS));
         return fresh;
+    }
+
+    private DirectionsResponse fetchRouteFromORS(DirectionsRequest request) {
+        String url = String.format(Locale.US, "%s?api_key=%s&start=%.6f,%.6f&end=%.6f,%.6f", 
+                ORS_URL, orsKey, request.getFromLng(), request.getFromLat(), request.getToLng(), request.getToLat());
+
+        long startedAt = System.currentTimeMillis();
+        try {
+            outboundRequests.incrementAndGet();
+            ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
+            long elapsedMs = System.currentTimeMillis() - startedAt;
+            logger.info("Routing provider response provider=ors status={} elapsedMs={}", response.getStatusCode().value(), elapsedMs);
+            return parseOrsDirections(response.getBody());
+        } catch (Exception ex) {
+            logger.error("ORS routing failed, falling back to OSRM", ex);
+            return fetchRouteFromPublicOsrm(request);
+        }
+    }
+
+    private DirectionsResponse parseOrsDirections(String body) {
+        try {
+            JsonNode root = objectMapper.readTree(body);
+            JsonNode features = root.path("features");
+            if (!features.isArray() || features.isEmpty()) {
+                throw new UpstreamServiceException(HttpStatus.BAD_GATEWAY, "No routes found in ORS");
+            }
+
+            JsonNode feature = features.path(0);
+            JsonNode geometry = feature.path("geometry");
+            JsonNode coordinates = geometry.path("coordinates");
+            List<DirectionsResponse.RoutePoint> routePoints = parseCoordinates(coordinates);
+
+            JsonNode properties = feature.path("properties");
+            JsonNode summary = properties.path("summary");
+            double distanceMeters = summary.path("distance").asDouble(0);
+            double durationSeconds = summary.path("duration").asDouble(0);
+
+            List<DirectionsResponse.RouteStep> steps = new ArrayList<>();
+            JsonNode segments = properties.path("segments");
+            if (segments.isArray() && !segments.isEmpty()) {
+                JsonNode stepsNode = segments.path(0).path("steps");
+                if (stepsNode.isArray()) {
+                    for (JsonNode step : stepsNode) {
+                        steps.add(new DirectionsResponse.RouteStep(
+                                step.path("instruction").asText("Continue"),
+                                step.path("distance").asDouble(0),
+                                step.path("duration").asDouble(0),
+                                step.path("type").asInt()
+                        ));
+                    }
+                }
+            }
+
+            return toResponse(routePoints, distanceMeters, durationSeconds, steps);
+        } catch (Exception ex) {
+            logger.error("Failed to parse ORS response", ex);
+            throw new UpstreamServiceException(HttpStatus.BAD_GATEWAY, "Routing parse failed");
+        }
     }
 
     private DirectionsResponse fetchRouteFromPublicOsrm(DirectionsRequest request) {

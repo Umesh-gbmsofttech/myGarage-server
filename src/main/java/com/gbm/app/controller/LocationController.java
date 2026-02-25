@@ -33,11 +33,4 @@ public class LocationController {
         User user = authService.requireUser(authorization);
         return ResponseEntity.ok(locationService.updateLocation(user, id, request));
     }
-
-    @GetMapping("/bookings/{id}")
-    public ResponseEntity<List<LiveLocationDTO>> list(@RequestHeader("Authorization") String authorization,
-            @PathVariable Long id) {
-        User user = authService.requireUser(authorization);
-        return ResponseEntity.ok(locationService.getLocations(user, id));
-    }
 }
