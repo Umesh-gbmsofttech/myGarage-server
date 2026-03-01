@@ -1,8 +1,7 @@
 package com.gbm.app.service;
 
-import java.util.List;
-import java.util.stream.Collectors;
-
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -83,17 +82,15 @@ public class BookingService {
     }
 
     @Transactional(readOnly = true)
-    public List<BookingResponse> listForOwner(User owner) {
-        return bookingRepository.findByOwnerId(owner.getId()).stream()
-            .map(this::toResponse)
-            .collect(Collectors.toList());
+    public Page<BookingResponse> listForOwner(User owner, int page, int size) {
+        return bookingRepository.findByOwnerIdOrderByUpdatedAtDesc(owner.getId(), PageRequest.of(page, size))
+            .map(this::toResponse);
     }
 
     @Transactional(readOnly = true)
-    public List<BookingResponse> listForMechanic(User mechanic) {
-        return bookingRepository.findByMechanicId(mechanic.getId()).stream()
-            .map(this::toResponse)
-            .collect(Collectors.toList());
+    public Page<BookingResponse> listForMechanic(User mechanic, int page, int size) {
+        return bookingRepository.findByMechanicIdOrderByUpdatedAtDesc(mechanic.getId(), PageRequest.of(page, size))
+            .map(this::toResponse);
     }
 
     @Transactional(readOnly = true)
@@ -106,6 +103,16 @@ public class BookingService {
         }
         return bookingRepository.findSummaryById(bookingId)
             .orElseThrow(() -> new IllegalArgumentException("Booking not found"));
+    }
+
+    @Transactional(readOnly = true)
+    public BookingResponse getBooking(User user, Long bookingId) {
+        Booking booking = bookingRepository.findById(bookingId)
+            .orElseThrow(() -> new IllegalArgumentException("Booking not found"));
+        if (!booking.getOwner().getId().equals(user.getId()) && !booking.getMechanic().getId().equals(user.getId())) {
+            throw new IllegalArgumentException("Unauthorized");
+        }
+        return toResponse(booking);
     }
 
     public BookingResponse updateStatus(User user, Long bookingId, BookingStatus status) {
@@ -159,11 +166,40 @@ public class BookingService {
         }
         booking.setCompleteVerified(true);
         booking.setStatus(BookingStatus.COMPLETED);
+        booking.setServiceCompletedAt(java.time.Instant.now());
         Booking saved = bookingRepository.save(booking);
         notificationService.create(saved.getOwner(), "OTP verified", "OTP verification successful",
             NotificationType.OTP, "{\"bookingId\":" + saved.getId() + "}");
         notificationService.create(saved.getMechanic(), "OTP verified", "OTP verification successful",
             NotificationType.OTP, "{\"bookingId\":" + saved.getId() + "}");
+        return toResponse(saved);
+    }
+
+    public BookingResponse submitReport(User user, Long bookingId, String description) {
+        Booking booking = bookingRepository.findById(bookingId)
+            .orElseThrow(() -> new IllegalArgumentException("Booking not found"));
+        if (!booking.getOwner().getId().equals(user.getId()) && !booking.getMechanic().getId().equals(user.getId())) {
+            throw new IllegalArgumentException("Unauthorized");
+        }
+        if (booking.getStatus() != BookingStatus.COMPLETED) {
+            throw new IllegalArgumentException("Report can be submitted only after service completion");
+        }
+        if (description == null || description.trim().isEmpty()) {
+            throw new IllegalArgumentException("Report description is required");
+        }
+        booking.setReportDescription(description.trim());
+        booking.setReportCreatedAt(java.time.Instant.now());
+        booking.setReporter(user);
+        Booking saved = bookingRepository.save(booking);
+
+        User notifyUser = booking.getOwner().getId().equals(user.getId()) ? booking.getMechanic() : booking.getOwner();
+        notificationService.create(
+            notifyUser,
+            "Service report submitted",
+            "A service issue was reported for booking #" + booking.getId(),
+            NotificationType.BOOKING_STATUS,
+            "{\"bookingId\":" + saved.getId() + "}"
+        );
         return toResponse(saved);
     }
 
@@ -199,6 +235,13 @@ public class BookingService {
         response.setCompleteOtp(booking.getCompleteOtp());
         response.setMeetVerified(booking.isMeetVerified());
         response.setCompleteVerified(booking.isCompleteVerified());
+        response.setServiceCompletedAt(booking.getServiceCompletedAt());
+        response.setReportDescription(booking.getReportDescription());
+        response.setReportCreatedAt(booking.getReportCreatedAt());
+        response.setReporterUserId(booking.getReporter() != null ? booking.getReporter().getId() : null);
+        response.setReporterRole(booking.getReporter() != null && booking.getReporter().getRole() != null
+            ? booking.getReporter().getRole().name()
+            : null);
 
         // Populate Profile Images
         vehicleOwnerProfileRepository.findByUserId(booking.getOwner().getId()).ifPresent(p -> {

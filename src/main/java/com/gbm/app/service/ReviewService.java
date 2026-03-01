@@ -2,6 +2,8 @@ package com.gbm.app.service;
 
 import java.util.List;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import com.gbm.app.dto.ReviewRequest;
@@ -47,8 +49,16 @@ public class ReviewService {
         return reviewRepository.findByTypeOrderByCreatedAtDesc(ReviewType.PLATFORM);
     }
 
+    public Page<Review> listPlatformReviews(int page, int size) {
+        return reviewRepository.findByTypeOrderByCreatedAtDesc(ReviewType.PLATFORM, PageRequest.of(page, size));
+    }
+
     public List<Review> listMechanicReviews(Long mechanicId) {
         return reviewRepository.findByMechanicIdOrderByCreatedAtDesc(mechanicId);
+    }
+
+    public Page<Review> listMechanicReviews(Long mechanicId, int page, int size) {
+        return reviewRepository.findByMechanicIdOrderByCreatedAtDesc(mechanicId, PageRequest.of(page, size));
     }
 
     private void updateMechanicRating(Long mechanicId, Integer rating) {

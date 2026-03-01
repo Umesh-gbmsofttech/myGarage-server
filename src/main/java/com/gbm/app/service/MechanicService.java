@@ -5,6 +5,10 @@ import java.util.List;
 import java.util.Random;
 import java.util.stream.Collectors;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -51,6 +55,25 @@ public class MechanicService {
             .filter(card -> card.getDistanceKm() == null || card.getDistanceKm() <= radiusKm)
             .sorted(Comparator.comparing(MechanicCardResponse::getRating, Comparator.nullsLast(Double::compareTo)).reversed())
             .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public Page<MechanicCardResponse> searchPaged(String query, Double lat, Double lng, double radiusKm, int page, int size) {
+        String safeQuery = query == null ? "" : query.trim();
+        PageRequest pageable = PageRequest.of(
+            page,
+            size,
+            Sort.by(Sort.Order.desc("rating"), Sort.Order.asc("id"))
+        );
+        Page<MechanicProfile> profiles = safeQuery.isBlank()
+            ? mechanicProfileRepository.findByVisibleTrue(pageable)
+            : mechanicProfileRepository.searchVisible(safeQuery.toLowerCase(), pageable);
+        List<MechanicCardResponse> filtered = profiles
+            .map(profile -> withDistance(profile, lat, lng))
+            .stream()
+            .filter(card -> card.getDistanceKm() == null || card.getDistanceKm() <= radiusKm)
+            .collect(Collectors.toList());
+        return new PageImpl<>(filtered, pageable, profiles.getTotalElements());
     }
 
     public MechanicCardResponse withDistance(MechanicProfile profile, Double lat, Double lng) {
