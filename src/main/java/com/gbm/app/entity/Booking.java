@@ -63,6 +63,17 @@ public class Booking {
 
     private boolean completeVerified;
 
+    private Instant serviceCompletedAt;
+
+    @Column(length = 4000)
+    private String reportDescription;
+
+    private Instant reportCreatedAt;
+
+    @ManyToOne
+    @JoinColumn(name = "reporter_user_id")
+    private User reporter;
+
     @Column(nullable = false)
     private Instant createdAt;
 

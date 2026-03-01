@@ -21,3 +21,8 @@ The production database is hosted on Aiven. To connect to the Aiven database, yo
 1.  Obtain the `aiven-ca.pem` certificate file.
 2.  Place the `aiven-ca.pem` file in the base directory where the Dockerfile is placed.
 3.  In the `application.properties` file, comment out the local database configuration and uncomment the Aiven database configuration.
+
+
+## Using Cron job website to keep alive render hosted server:
+
+1.  https://console.cron-job.org/jobs

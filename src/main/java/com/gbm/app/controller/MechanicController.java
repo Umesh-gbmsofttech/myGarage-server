@@ -2,6 +2,7 @@ package com.gbm.app.controller;
 
 import java.util.List;
 
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -37,5 +38,16 @@ public class MechanicController {
             @RequestParam(required = false) Double lng,
             @RequestParam(defaultValue = "5") double radiusKm) {
         return ResponseEntity.ok(mechanicService.search(query, lat, lng, radiusKm));
+    }
+
+    @GetMapping("/search/paged")
+    public ResponseEntity<Page<MechanicCardResponse>> searchPaged(
+            @RequestParam(required = false) String query,
+            @RequestParam(required = false) Double lat,
+            @RequestParam(required = false) Double lng,
+            @RequestParam(defaultValue = "5") double radiusKm,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return ResponseEntity.ok(mechanicService.searchPaged(query, lat, lng, radiusKm, page, size));
     }
 }

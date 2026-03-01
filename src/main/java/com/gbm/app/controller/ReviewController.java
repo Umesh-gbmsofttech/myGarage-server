@@ -2,6 +2,7 @@ package com.gbm.app.controller;
 
 import java.util.List;
 
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -9,6 +10,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.gbm.app.dto.ReviewRequest;
@@ -39,8 +41,23 @@ public class ReviewController {
         return ResponseEntity.ok(reviewService.listPlatformReviews());
     }
 
+    @GetMapping("/platform/paged")
+    public ResponseEntity<Page<Review>> platformReviewsPaged(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return ResponseEntity.ok(reviewService.listPlatformReviews(page, size));
+    }
+
     @GetMapping("/mechanics/{id}")
     public ResponseEntity<List<Review>> mechanicReviews(@PathVariable Long id) {
         return ResponseEntity.ok(reviewService.listMechanicReviews(id));
+    }
+
+    @GetMapping("/mechanics/{id}/paged")
+    public ResponseEntity<Page<Review>> mechanicReviewsPaged(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return ResponseEntity.ok(reviewService.listMechanicReviews(id, page, size));
     }
 }

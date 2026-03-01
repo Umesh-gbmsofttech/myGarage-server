@@ -20,6 +20,11 @@ public class BookingResponse {
     private String completeOtp;
     private boolean meetVerified;
     private boolean completeVerified;
+    private Instant serviceCompletedAt;
+    private String reportDescription;
+    private Instant reportCreatedAt;
+    private Long reporterUserId;
+    private String reporterRole;
     private String ownerProfileImageUrl;
     private String mechanicProfileImageUrl;
     private Instant createdAt;
