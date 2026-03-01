@@ -16,16 +16,32 @@ public interface MechanicProfileRepository extends JpaRepository<MechanicProfile
     List<MechanicProfile> findByVisibleTrue();
     Page<MechanicProfile> findByVisibleTrue(Pageable pageable);
 
-    @Query("""
-        SELECT m
-        FROM MechanicProfile m
-        WHERE m.visible = true
-          AND (
-            LOWER(CONCAT(COALESCE(m.user.firstName, ''), ' ', COALESCE(m.user.surname, ''))) LIKE LOWER(CONCAT('%', :query, '%'))
-            OR LOWER(COALESCE(m.speciality, '')) LIKE LOWER(CONCAT('%', :query, '%'))
-            OR LOWER(COALESCE(m.expertise, '')) LIKE LOWER(CONCAT('%', :query, '%'))
-            OR LOWER(COALESCE(m.city, '')) LIKE LOWER(CONCAT('%', :query, '%'))
-          )
-    """)
+    @Query(
+        value = """
+            SELECT mp.*
+            FROM mechanic_profiles mp
+            JOIN users u ON u.id = mp.user_id
+            WHERE mp.visible = true
+              AND (
+                LOWER(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.surname, ''))) LIKE CONCAT('%', :query, '%')
+                OR LOWER(COALESCE(mp.speciality, '')) LIKE CONCAT('%', :query, '%')
+                OR LOWER(COALESCE(mp.expertise, '')) LIKE CONCAT('%', :query, '%')
+                OR LOWER(COALESCE(mp.city, '')) LIKE CONCAT('%', :query, '%')
+              )
+            """,
+        countQuery = """
+            SELECT COUNT(*)
+            FROM mechanic_profiles mp
+            JOIN users u ON u.id = mp.user_id
+            WHERE mp.visible = true
+              AND (
+                LOWER(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.surname, ''))) LIKE CONCAT('%', :query, '%')
+                OR LOWER(COALESCE(mp.speciality, '')) LIKE CONCAT('%', :query, '%')
+                OR LOWER(COALESCE(mp.expertise, '')) LIKE CONCAT('%', :query, '%')
+                OR LOWER(COALESCE(mp.city, '')) LIKE CONCAT('%', :query, '%')
+              )
+            """,
+        nativeQuery = true
+    )
     Page<MechanicProfile> searchVisible(@Param("query") String query, Pageable pageable);
 }
