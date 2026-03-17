@@ -9,7 +9,6 @@ import org.springframework.validation.annotation.Validated;
 @ConfigurationProperties(prefix = "api.keys")
 public class ApiKeysConfig {
 
-    @NotBlank
     private String openAi;
 
     @Valid

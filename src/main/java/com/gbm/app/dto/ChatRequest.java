@@ -8,4 +8,7 @@ public class ChatRequest {
 
     @NotBlank
     private String message;
+
+    private String userName;
+    private String userRole;
 }

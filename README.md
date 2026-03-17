@@ -2,6 +2,14 @@
 
 This is the backend server for the My Garage application.
 
+## AI Chat (Groq)
+
+The in-app Support Chat uses Groq. Configure the key via:
+- `GROQ_API_KEY` environment variable, or
+- `api.groq.key` in `src/main/resources/application.properties`.
+
+The assistant is scoped to user features (login, signup, bookings, ratings, feedback, DIY) and intentionally refuses admin guidance.
+
 ## Database Configuration
 
 The application is configured to connect to a MySQL database. The configuration can be found in the `src/main/resources/application.properties` file.
@@ -26,3 +34,26 @@ The production database is hosted on Aiven. To connect to the Aiven database, yo
 ## Using Cron job website to keep alive render hosted server:
 
 1.  https://console.cron-job.org/jobs
+
+## Mobile Build Commands (for frontend app)
+
+1. Generate Android native files (clean)
+```
+npx expo prebuild --platform android --clean
+```
+
+2. Local APK build (Windows)
+```
+cd android
+.\gradlew.bat clean assembleRelease
+```
+
+3. EAS Android build (clear cache)
+```
+eas build -p android --clear-cache
+```
+
+4. EAS iOS build (clear cache)
+```
+eas build -p ios --clear-cache
+```
