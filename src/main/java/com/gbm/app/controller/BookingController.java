@@ -16,7 +16,9 @@ import com.gbm.app.dto.BookingReportRequest;
 import com.gbm.app.dto.BookingRespondRequest;
 import com.gbm.app.dto.BookingResponse;
 import com.gbm.app.dto.BookingSummaryDTO;
+import com.gbm.app.dto.BookingAssignWorkerRequest;
 import com.gbm.app.dto.OtpCodeRequest;
+import com.gbm.app.dto.RouteStatsUpdateRequest;
 import com.gbm.app.entity.User;
 import com.gbm.app.service.AuthService;
 import com.gbm.app.service.BookingService;
@@ -64,6 +66,20 @@ public class BookingController {
             @PathVariable Long id) {
         User owner = authService.requireUser(authorization);
         return ResponseEntity.ok(bookingService.generateCompleteOtp(owner, id));
+    }
+
+    @PostMapping("/{id}/assign-worker")
+    public ResponseEntity<BookingResponse> assignWorker(@RequestHeader("Authorization") String authorization,
+            @PathVariable Long id, @RequestBody BookingAssignWorkerRequest request) {
+        User garageOwner = authService.requireUser(authorization);
+        return ResponseEntity.ok(bookingService.assignWorker(garageOwner, id, request.getWorkerUserId()));
+    }
+
+    @PostMapping("/{id}/route-stats")
+    public ResponseEntity<BookingResponse> routeStats(@RequestHeader("Authorization") String authorization,
+            @PathVariable Long id, @RequestBody RouteStatsUpdateRequest request) {
+        User actor = authService.requireUser(authorization);
+        return ResponseEntity.ok(bookingService.updateRouteStats(actor, id, request.getDistanceKm(), request.getDurationMinutes()));
     }
 
     @PostMapping("/{id}/report")

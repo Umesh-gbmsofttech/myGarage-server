@@ -3,10 +3,13 @@ package com.gbm.app.entity;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
@@ -37,8 +40,10 @@ public class MechanicProfile {
 
     private String city;
 
+    private String certificate;
+
     @Column(nullable = false)
-    private boolean shopActive = true;
+    private boolean available = true;
 
     private Double rating = 0.0;
 
@@ -52,8 +57,22 @@ public class MechanicProfile {
     private boolean visible = true;
 
     private Long profileImageId;
+    private Long certificationDocumentImageId;
+    private Long shopActDocumentImageId;
 
     private String expertise;
 
     private String about;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private ApprovalStatus approvalStatus = ApprovalStatus.PENDING;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private MechanicRegistrationSource registrationSource = MechanicRegistrationSource.SELF;
+
+    @ManyToOne
+    @JoinColumn(name = "garage_owner_user_id")
+    private User garageOwner;
 }

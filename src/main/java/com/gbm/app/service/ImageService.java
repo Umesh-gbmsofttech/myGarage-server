@@ -34,7 +34,7 @@ import lombok.RequiredArgsConstructor;
 public class ImageService {
 
     private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
-            "image/jpeg", "image/jpg", "image/png", "image/webp");
+            "image/jpeg", "image/jpg", "image/png", "image/webp", "application/pdf");
 
     private final ImageRepository imageRepository;
     private final ImageUrlService imageUrlService;
@@ -142,7 +142,7 @@ public class ImageService {
         }
         String contentType = normalizedContentType(file);
         if (!ALLOWED_CONTENT_TYPES.contains(contentType)) {
-            throw new IllegalArgumentException("Unsupported image type");
+            throw new IllegalArgumentException("Unsupported file type");
         }
     }
 
@@ -171,7 +171,7 @@ public class ImageService {
         try {
             return new SerialBlob(file.getBytes());
         } catch (Exception ex) {
-            throw new IllegalArgumentException("Failed to process image");
+            throw new IllegalArgumentException("Failed to process file");
         }
     }
 

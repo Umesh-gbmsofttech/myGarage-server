@@ -11,7 +11,9 @@ import com.gbm.app.dto.BookingRespondRequest;
 import com.gbm.app.dto.BookingResponse;
 import com.gbm.app.entity.Booking;
 import com.gbm.app.entity.BookingStatus;
+import com.gbm.app.entity.MechanicProfile;
 import com.gbm.app.entity.NotificationType;
+import com.gbm.app.entity.Role;
 import com.gbm.app.entity.User;
 import com.gbm.app.repository.BookingRepository;
 import com.gbm.app.repository.MechanicProfileRepository;
@@ -35,6 +37,9 @@ public class BookingService {
     public BookingResponse createBooking(User owner, BookingRequest request) {
         User mechanic = userRepository.findById(request.getMechanicId())
             .orElseThrow(() -> new IllegalArgumentException("Mechanic not found"));
+        if (mechanic.getRole() != Role.MECHANIC && mechanic.getRole() != Role.GARAGE_OWNER) {
+            throw new IllegalArgumentException("Selected provider cannot receive bookings");
+        }
 
         Booking booking = new Booking();
         booking.setOwner(owner);
@@ -44,6 +49,9 @@ public class BookingService {
         booking.setVehicleModel(request.getVehicleModel());
         booking.setVehicleYear(request.getVehicleYear());
         booking.setIssueDescription(request.getIssueDescription());
+        booking.setServiceLatitude(request.getServiceLatitude());
+        booking.setServiceLongitude(request.getServiceLongitude());
+        booking.setServiceAddress(request.getServiceAddress());
 
         Booking saved = bookingRepository.save(booking);
 
@@ -58,25 +66,48 @@ public class BookingService {
         Booking booking = bookingRepository.findById(bookingId)
             .orElseThrow(() -> new IllegalArgumentException("Booking not found"));
 
-        if (!booking.getMechanic().getId().equals(mechanic.getId())) {
+        boolean isPrimaryProvider = booking.getMechanic().getId().equals(mechanic.getId());
+        boolean isAssignedWorker = booking.getAssignedWorker() != null && booking.getAssignedWorker().getId().equals(mechanic.getId());
+        if (!isPrimaryProvider && !isAssignedWorker) {
             throw new IllegalArgumentException("Unauthorized");
         }
 
-        if (request.getStatus() == BookingStatus.ACCEPTED) {
+        if (isAssignedWorker && !isPrimaryProvider) {
+            if (request.getStatus() == BookingStatus.ACCEPTED) {
+                booking.setAssignedWorkerAccepted(Boolean.TRUE);
+            } else if (request.getStatus() == BookingStatus.DECLINED) {
+                booking.setAssignedWorker(null);
+                booking.setAssignedWorkerAccepted(Boolean.FALSE);
+            } else {
+                throw new IllegalArgumentException("Unsupported status");
+            }
+        } else if (request.getStatus() == BookingStatus.ACCEPTED) {
             booking.setStatus(BookingStatus.ACCEPTED);
             booking.setMeetOtp(OtpUtil.generateOtp());
             booking.setCompleteOtp(null);
+            booking.setAssignedWorkerAccepted(booking.getAssignedWorker() == null ? Boolean.FALSE : booking.getAssignedWorkerAccepted());
         } else if (request.getStatus() == BookingStatus.DECLINED) {
             booking.setStatus(BookingStatus.DECLINED);
+            booking.setAssignedWorkerAccepted(Boolean.FALSE);
         } else {
             throw new IllegalArgumentException("Unsupported status");
         }
 
         Booking saved = bookingRepository.save(booking);
+        String actorName = mechanic.getFirstName() == null || mechanic.getFirstName().isBlank()
+            ? "Mechanic"
+            : mechanic.getFirstName();
 
         notificationService.create(saved.getOwner(), "Booking update",
-            "Your booking was " + saved.getStatus().name().toLowerCase(),
+            "Your booking was " + saved.getStatus().name().toLowerCase() + " by " + actorName,
             NotificationType.BOOKING_STATUS, "{\"bookingId\":" + saved.getId() + "}");
+        if (saved.getMechanic() != null && !saved.getMechanic().getId().equals(mechanic.getId())) {
+            notificationService.create(saved.getMechanic(), "Worker response update",
+                request.getStatus() == BookingStatus.DECLINED
+                    ? "Your assigned mechanic " + actorName + " declined booking #" + saved.getId() + ". Please assign another worker."
+                    : "Your assigned mechanic " + actorName + " accepted booking #" + saved.getId(),
+                NotificationType.BOOKING_STATUS, "{\"bookingId\":" + saved.getId() + "}");
+        }
 
         return toResponse(saved);
     }
@@ -89,6 +120,11 @@ public class BookingService {
 
     @Transactional(readOnly = true)
     public Page<BookingResponse> listForMechanic(User mechanic, int page, int size) {
+        MechanicProfile mechanicProfile = mechanicProfileRepository.findByUserId(mechanic.getId()).orElse(null);
+        if (mechanicProfile != null && mechanicProfile.getGarageOwner() != null) {
+            return bookingRepository.findByAssignedWorkerIdOrderByUpdatedAtDesc(mechanic.getId(), PageRequest.of(page, size))
+                .map(this::toResponse);
+        }
         return bookingRepository.findByMechanicIdOrderByUpdatedAtDesc(mechanic.getId(), PageRequest.of(page, size))
             .map(this::toResponse);
     }
@@ -109,7 +145,9 @@ public class BookingService {
     public BookingResponse getBooking(User user, Long bookingId) {
         Booking booking = bookingRepository.findById(bookingId)
             .orElseThrow(() -> new IllegalArgumentException("Booking not found"));
-        if (!booking.getOwner().getId().equals(user.getId()) && !booking.getMechanic().getId().equals(user.getId())) {
+        if (!booking.getOwner().getId().equals(user.getId())
+            && !booking.getMechanic().getId().equals(user.getId())
+            && (booking.getAssignedWorker() == null || !booking.getAssignedWorker().getId().equals(user.getId()))) {
             throw new IllegalArgumentException("Unauthorized");
         }
         return toResponse(booking);
@@ -118,7 +156,9 @@ public class BookingService {
     public BookingResponse updateStatus(User user, Long bookingId, BookingStatus status) {
         Booking booking = bookingRepository.findById(bookingId)
             .orElseThrow(() -> new IllegalArgumentException("Booking not found"));
-        if (!booking.getOwner().getId().equals(user.getId()) && !booking.getMechanic().getId().equals(user.getId())) {
+        if (!booking.getOwner().getId().equals(user.getId())
+            && !booking.getMechanic().getId().equals(user.getId())
+            && (booking.getAssignedWorker() == null || !booking.getAssignedWorker().getId().equals(user.getId()))) {
             throw new IllegalArgumentException("Unauthorized");
         }
         booking.setStatus(status);
@@ -133,7 +173,7 @@ public class BookingService {
     public BookingResponse verifyMeetOtp(User mechanic, Long bookingId, String code) {
         Booking booking = bookingRepository.findById(bookingId)
             .orElseThrow(() -> new IllegalArgumentException("Booking not found"));
-        if (!booking.getMechanic().getId().equals(mechanic.getId())) {
+        if (!canOperateBookingWorker(mechanic, booking)) {
             throw new IllegalArgumentException("Unauthorized");
         }
         if (booking.getMeetOtp() == null) {
@@ -155,7 +195,7 @@ public class BookingService {
     public BookingResponse verifyCompleteOtp(User mechanic, Long bookingId, String code) {
         Booking booking = bookingRepository.findById(bookingId)
             .orElseThrow(() -> new IllegalArgumentException("Booking not found"));
-        if (!booking.getMechanic().getId().equals(mechanic.getId())) {
+        if (!canOperateBookingWorker(mechanic, booking)) {
             throw new IllegalArgumentException("Unauthorized");
         }
         if (booking.getCompleteOtp() == null) {
@@ -178,7 +218,9 @@ public class BookingService {
     public BookingResponse submitReport(User user, Long bookingId, String description) {
         Booking booking = bookingRepository.findById(bookingId)
             .orElseThrow(() -> new IllegalArgumentException("Booking not found"));
-        if (!booking.getOwner().getId().equals(user.getId()) && !booking.getMechanic().getId().equals(user.getId())) {
+        if (!booking.getOwner().getId().equals(user.getId())
+            && !booking.getMechanic().getId().equals(user.getId())
+            && (booking.getAssignedWorker() == null || !booking.getAssignedWorker().getId().equals(user.getId()))) {
             throw new IllegalArgumentException("Unauthorized");
         }
         if (booking.getStatus() != BookingStatus.COMPLETED) {
@@ -221,16 +263,59 @@ public class BookingService {
         return toResponse(saved);
     }
 
+    public BookingResponse assignWorker(User garageOwner, Long bookingId, Long workerUserId) {
+        Booking booking = bookingRepository.findById(bookingId)
+            .orElseThrow(() -> new IllegalArgumentException("Booking not found"));
+        if (!booking.getMechanic().getId().equals(garageOwner.getId()) || garageOwner.getRole() != Role.GARAGE_OWNER) {
+            throw new IllegalArgumentException("Unauthorized");
+        }
+        MechanicProfile workerProfile = mechanicProfileRepository.findByUserId(workerUserId)
+            .orElseThrow(() -> new IllegalArgumentException("Worker not found"));
+        if (workerProfile.getGarageOwner() == null || !workerProfile.getGarageOwner().getId().equals(garageOwner.getId())) {
+            throw new IllegalArgumentException("Worker does not belong to this garage owner");
+        }
+        if (!workerProfile.isVisible() || !workerProfile.isAvailable()) {
+            throw new IllegalArgumentException("Selected worker is currently unavailable");
+        }
+        booking.setAssignedWorker(workerProfile.getUser());
+        booking.setAssignedWorkerAccepted(Boolean.FALSE);
+        Booking saved = bookingRepository.save(booking);
+        notificationService.create(
+            workerProfile.getUser(),
+            "Service assigned",
+            "A new service request has been assigned to you",
+            NotificationType.BOOKING_STATUS,
+            "{\"bookingId\":" + saved.getId() + "}"
+        );
+        return toResponse(saved);
+    }
+
+    public BookingResponse updateRouteStats(User actor, Long bookingId, Double distanceKm, Double durationMinutes) {
+        Booking booking = bookingRepository.findById(bookingId)
+            .orElseThrow(() -> new IllegalArgumentException("Booking not found"));
+        if (!canOperateBookingWorker(actor, booking)) {
+            throw new IllegalArgumentException("Unauthorized");
+        }
+        booking.setRouteDistanceKm(distanceKm);
+        booking.setRouteDurationMinutes(durationMinutes);
+        return toResponse(bookingRepository.save(booking));
+    }
+
     private BookingResponse toResponse(Booking booking) {
         BookingResponse response = new BookingResponse();
         response.setId(booking.getId());
         response.setOwnerId(booking.getOwner().getId());
         response.setMechanicId(booking.getMechanic().getId());
+        response.setAssignedWorkerId(booking.getAssignedWorker() != null ? booking.getAssignedWorker().getId() : null);
+        response.setAssignedWorkerAccepted(Boolean.TRUE.equals(booking.getAssignedWorkerAccepted()));
         response.setStatus(booking.getStatus());
         response.setVehicleMake(booking.getVehicleMake());
         response.setVehicleModel(booking.getVehicleModel());
         response.setVehicleYear(booking.getVehicleYear());
         response.setIssueDescription(booking.getIssueDescription());
+        response.setServiceLatitude(booking.getServiceLatitude());
+        response.setServiceLongitude(booking.getServiceLongitude());
+        response.setServiceAddress(booking.getServiceAddress());
         response.setMeetOtp(booking.getMeetOtp());
         response.setCompleteOtp(booking.getCompleteOtp());
         response.setMeetVerified(booking.isMeetVerified());
@@ -250,9 +335,24 @@ public class BookingService {
         mechanicProfileRepository.findByUserId(booking.getMechanic().getId()).ifPresent(p -> {
             response.setMechanicProfileImageUrl(imageUrlService.toImageUrl(p.getProfileImageId()));
         });
+        if (booking.getAssignedWorker() != null) {
+            mechanicProfileRepository.findByUserId(booking.getAssignedWorker().getId()).ifPresent(p -> {
+                response.setAssignedWorkerProfileImageUrl(imageUrlService.toImageUrl(p.getProfileImageId()));
+            });
+        }
+        response.setRouteDistanceKm(booking.getRouteDistanceKm());
+        response.setRouteDurationMinutes(booking.getRouteDurationMinutes());
 
         response.setCreatedAt(booking.getCreatedAt());
         response.setUpdatedAt(booking.getUpdatedAt());
         return response;
+    }
+
+    private boolean canOperateBookingWorker(User actor, Booking booking) {
+        if (booking.getAssignedWorker() != null) {
+            return booking.getMechanic().getId().equals(actor.getId())
+                || (booking.getAssignedWorker().getId().equals(actor.getId()) && Boolean.TRUE.equals(booking.getAssignedWorkerAccepted()));
+        }
+        return booking.getMechanic().getId().equals(actor.getId());
     }
 }

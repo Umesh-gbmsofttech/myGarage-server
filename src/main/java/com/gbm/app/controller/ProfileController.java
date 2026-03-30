@@ -13,6 +13,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.gbm.app.dto.UpdateProfileRequest;
 import com.gbm.app.dto.UserProfileResponse;
+import com.gbm.app.dto.AvailabilityRequest;
+import com.gbm.app.dto.ProfileDocumentType;
 import com.gbm.app.entity.User;
 import com.gbm.app.service.AuthService;
 import com.gbm.app.service.ProfileService;
@@ -40,10 +42,27 @@ public class ProfileController {
         return ResponseEntity.ok(profileService.updateProfile(user, request));
     }
 
+    @PutMapping("/availability")
+    public ResponseEntity<UserProfileResponse> updateAvailability(@RequestHeader("Authorization") String authorization,
+            @RequestBody AvailabilityRequest request) {
+        User user = authService.requireUser(authorization);
+        UpdateProfileRequest update = new UpdateProfileRequest();
+        update.setAvailable(request.getAvailable());
+        return ResponseEntity.ok(profileService.updateProfile(user, update));
+    }
+
     @PostMapping("/upload-avatar")
     public ResponseEntity<UserProfileResponse> uploadAvatar(@RequestHeader("Authorization") String authorization,
             @RequestParam("file") MultipartFile file) {
         User user = authService.requireUser(authorization);
         return ResponseEntity.ok(profileService.uploadProfileImage(user, file));
+    }
+
+    @PostMapping("/upload-document")
+    public ResponseEntity<UserProfileResponse> uploadDocument(@RequestHeader("Authorization") String authorization,
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("type") ProfileDocumentType type) {
+        User user = authService.requireUser(authorization);
+        return ResponseEntity.ok(profileService.uploadDocument(user, file, type));
     }
 }

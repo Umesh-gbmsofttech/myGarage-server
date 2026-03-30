@@ -9,9 +9,12 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.gbm.app.dto.AdminSettingsRequest;
 import com.gbm.app.dto.BannerResponse;
+import com.gbm.app.dto.MechanicCardResponse;
+import com.gbm.app.entity.ApprovalStatus;
 import com.gbm.app.entity.AdminSettings;
 import com.gbm.app.entity.Banner;
 import com.gbm.app.entity.MechanicProfile;
+import com.gbm.app.entity.MechanicRegistrationSource;
 import com.gbm.app.repository.AdminSettingsRepository;
 import com.gbm.app.repository.BannerRepository;
 import com.gbm.app.repository.MechanicProfileRepository;
@@ -27,6 +30,7 @@ public class AdminService {
     private final MechanicProfileRepository mechanicProfileRepository;
     private final ImageService imageService;
     private final ImageUrlService imageUrlService;
+    private final MechanicService mechanicService;
 
     @Transactional(readOnly = true)
     public List<BannerResponse> listBanners() {
@@ -71,6 +75,23 @@ public class AdminService {
                 .orElseThrow(() -> new IllegalArgumentException("Mechanic profile not found"));
         profile.setVisible(visible);
         return mechanicProfileRepository.save(profile);
+    }
+
+    @Transactional(readOnly = true)
+    public List<MechanicCardResponse> pendingApprovals() {
+        return mechanicProfileRepository.findByApprovalStatus(ApprovalStatus.PENDING).stream()
+            .filter(profile -> profile.getRegistrationSource() == MechanicRegistrationSource.SELF)
+            .map(profile -> mechanicService.withDistance(profile, null, null))
+            .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public MechanicCardResponse updateApproval(Long mechanicUserId, ApprovalStatus status) {
+        MechanicProfile profile = mechanicProfileRepository.findByUserId(mechanicUserId)
+            .orElseThrow(() -> new IllegalArgumentException("Mechanic profile not found"));
+        profile.setApprovalStatus(status);
+        profile.setVisible(status == ApprovalStatus.APPROVED && profile.isVisible());
+        return mechanicService.withDistance(mechanicProfileRepository.save(profile), null, null);
     }
 
     private BannerResponse toBannerResponse(Banner banner) {

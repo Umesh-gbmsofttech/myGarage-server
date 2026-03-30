@@ -3,8 +3,10 @@ package com.gbm.app.service;
 import java.time.Instant;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -14,15 +16,22 @@ import org.slf4j.LoggerFactory;
 
 import com.gbm.app.dto.AuthRequest;
 import com.gbm.app.dto.AuthResponse;
+import com.gbm.app.dto.ForgotPasswordRequest;
+import com.gbm.app.dto.ResetPasswordRequest;
 import com.gbm.app.dto.SignupMechanicRequest;
 import com.gbm.app.dto.SignupOwnerRequest;
+import com.gbm.app.dto.VerifyOtpRequest;
+import com.gbm.app.entity.ApprovalStatus;
 import com.gbm.app.entity.AuthSession;
 import com.gbm.app.entity.MechanicProfile;
+import com.gbm.app.entity.MechanicRegistrationSource;
+import com.gbm.app.entity.PasswordResetOtp;
 import com.gbm.app.entity.Role;
 import com.gbm.app.entity.User;
 import com.gbm.app.entity.VehicleOwnerProfile;
 import com.gbm.app.repository.AuthSessionRepository;
 import com.gbm.app.repository.MechanicProfileRepository;
+import com.gbm.app.repository.PasswordResetOtpRepository;
 import com.gbm.app.repository.UserRepository;
 import com.gbm.app.repository.VehicleOwnerProfileRepository;
 
@@ -34,17 +43,21 @@ public class AuthService {
 
     private static final Logger log = LoggerFactory.getLogger(AuthService.class);
     private static final long TOKEN_CACHE_TTL_MS = 60_000L;
+    private static final Pattern PASSWORD_RULE =
+        Pattern.compile("^(?=.*[A-Z])(?=.*\\d)(?=.*[^A-Za-z0-9]).{8,}$");
     private final UserRepository userRepository;
     private final AuthSessionRepository authSessionRepository;
     private final MechanicProfileRepository mechanicProfileRepository;
     private final VehicleOwnerProfileRepository vehicleOwnerProfileRepository;
+    private final PasswordResetOtpRepository passwordResetOtpRepository;
     private final PasswordEncoder passwordEncoder;
+    private final EmailService emailService;
     private final ConcurrentHashMap<String, CachedUserEntry> tokenUserCache = new ConcurrentHashMap<>();
 
     public AuthResponse signupMechanic(SignupMechanicRequest request) {
-        log.info("Signup mechanic request: mechName={}, surname={}, email={}, mobile={}, city={}, speciality={}, experience={}, shopAct={}",
+        log.info("Signup mechanic request: mechName={}, surname={}, email={}, mobile={}, city={}, speciality={}, experience={}",
             request.getMechName(), request.getSurname(), request.getEmail(), request.getMobile(),
-            request.getCity(), request.getSpeciality(), request.getExperience(), request.getShopAct());
+            request.getCity(), request.getSpeciality(), request.getExperience());
         if (userRepository.findByEmail(request.getEmail()).isPresent()) {
             throw new IllegalArgumentException("Email already in use");
         }
@@ -57,6 +70,7 @@ public class AuthService {
         user.setMobile(request.getMobile());
         user.setRole(Role.MECHANIC);
         user.setUsername(generateUsername(request.getEmail()));
+        validatePassword(request.getPassword());
         user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
 
         MechanicProfile profile = new MechanicProfile();
@@ -65,8 +79,9 @@ public class AuthService {
         profile.setSpeciality(request.getSpeciality());
         profile.setExpertise(request.getSpeciality());
         profile.setCity(request.getCity());
-        boolean shopActive = request.getShopAct() != null ? request.getShopAct() : Boolean.TRUE.equals(request.getShopActive());
-        profile.setShopActive(shopActive);
+        profile.setCertificate(request.getCertificate());
+        profile.setApprovalStatus(ApprovalStatus.PENDING);
+        profile.setRegistrationSource(MechanicRegistrationSource.SELF);
 
         mechanicProfileRepository.save(profile);
         log.info("Created mechanic user id={}", user.getId());
@@ -88,6 +103,7 @@ public class AuthService {
         user.setMobile(request.getMobile());
         user.setRole(Role.VEHICLE_OWNER);
         user.setUsername(generateUsername(request.getEmail()));
+        validatePassword(request.getPassword());
         user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
 
         VehicleOwnerProfile profile = new VehicleOwnerProfile();
@@ -183,6 +199,40 @@ public class AuthService {
         }
     }
 
+    public Map<String, Object> sendForgotPasswordOtp(ForgotPasswordRequest request) {
+        if (request == null || request.getEmail() == null || request.getEmail().isBlank()) {
+            throw new IllegalArgumentException("Email is required");
+        }
+        String email = request.getEmail().trim().toLowerCase();
+        userRepository.findByEmail(email).ifPresent(user -> {
+            PasswordResetOtp otp = new PasswordResetOtp();
+            otp.setUser(user);
+            otp.setOtp(generateOtp());
+            otp.setExpiresAt(Instant.now().plus(10, ChronoUnit.MINUTES));
+            passwordResetOtpRepository.save(otp);
+            emailService.sendOtpEmail(email, otp.getOtp());
+        });
+        return Map.of("message", "If the email exists, an OTP has been sent.");
+    }
+
+    public Map<String, Object> verifyOtp(VerifyOtpRequest request) {
+        PasswordResetOtp otp = resolveOtp(request.getEmail(), request.getOtp());
+        otp.setVerifiedAt(Instant.now());
+        passwordResetOtpRepository.save(otp);
+        return Map.of("message", "OTP verified");
+    }
+
+    public Map<String, Object> resetPassword(ResetPasswordRequest request) {
+        validatePassword(request.getNewPassword());
+        PasswordResetOtp otp = resolveOtp(request.getEmail(), request.getOtp());
+        otp.setUsedAt(Instant.now());
+        passwordResetOtpRepository.save(otp);
+        User user = otp.getUser();
+        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+        return Map.of("message", "Password updated");
+    }
+
     private String generateUsername(String email) {
         String base = email.split("@")[0];
         String username = base;
@@ -210,6 +260,36 @@ public class AuthService {
             return;
         }
         tokenUserCache.put(token, new CachedUserEntry(user, sessionExpiresAt, now.plusMillis(ttlMs)));
+    }
+
+    private PasswordResetOtp resolveOtp(String email, String otpValue) {
+        if (email == null || email.isBlank()) throw new IllegalArgumentException("Email is required");
+        if (otpValue == null || otpValue.isBlank()) throw new IllegalArgumentException("OTP is required");
+        User user = userRepository.findByEmail(email.trim().toLowerCase())
+            .orElseThrow(() -> new IllegalArgumentException("Invalid OTP"));
+        PasswordResetOtp otp = passwordResetOtpRepository.findTopByUserOrderByCreatedAtDesc(user)
+            .orElseThrow(() -> new IllegalArgumentException("Invalid OTP"));
+        if (otp.getUsedAt() != null) throw new IllegalArgumentException("OTP already used");
+        if (otp.getExpiresAt() != null && Instant.now().isAfter(otp.getExpiresAt())) {
+            throw new IllegalArgumentException("OTP expired");
+        }
+        if (!otp.getOtp().equals(otpValue.trim())) {
+            otp.setAttempts(otp.getAttempts() + 1);
+            passwordResetOtpRepository.save(otp);
+            throw new IllegalArgumentException("Invalid OTP");
+        }
+        return otp;
+    }
+
+    private String generateOtp() {
+        int otp = 100000 + (int) (Math.random() * 900000);
+        return String.valueOf(otp);
+    }
+
+    private void validatePassword(String password) {
+        if (password == null || !PASSWORD_RULE.matcher(password).matches()) {
+            throw new IllegalArgumentException("Password must be at least 8 characters with 1 uppercase, 1 number, and 1 special character");
+        }
     }
 
     private static class CachedUserEntry {

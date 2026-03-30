@@ -9,4 +9,7 @@ public class BookingRequest {
     private String vehicleModel;
     private String vehicleYear;
     private String issueDescription;
+    private Double serviceLatitude;
+    private Double serviceLongitude;
+    private String serviceAddress;
 }

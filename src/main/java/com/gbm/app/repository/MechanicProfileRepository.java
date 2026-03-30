@@ -9,12 +9,18 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import com.gbm.app.entity.ApprovalStatus;
 import com.gbm.app.entity.MechanicProfile;
+import com.gbm.app.entity.User;
 
 public interface MechanicProfileRepository extends JpaRepository<MechanicProfile, Long> {
     Optional<MechanicProfile> findByUserId(Long userId);
     List<MechanicProfile> findByVisibleTrue();
     Page<MechanicProfile> findByVisibleTrue(Pageable pageable);
+    List<MechanicProfile> findByGarageOwner(User garageOwner);
+    List<MechanicProfile> findByApprovalStatus(ApprovalStatus approvalStatus);
+    List<MechanicProfile> findByVisibleTrueAndApprovalStatus(ApprovalStatus approvalStatus);
+    Page<MechanicProfile> findByVisibleTrueAndApprovalStatus(ApprovalStatus approvalStatus, Pageable pageable);
 
     @Query(
         value = """
@@ -22,6 +28,7 @@ public interface MechanicProfileRepository extends JpaRepository<MechanicProfile
             FROM mechanic_profiles mp
             JOIN users u ON u.id = mp.user_id
             WHERE mp.visible = true
+              AND mp.approval_status = 'APPROVED'
               AND (
                 LOWER(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.surname, ''))) LIKE CONCAT('%', :query, '%')
                 OR LOWER(COALESCE(mp.speciality, '')) LIKE CONCAT('%', :query, '%')
@@ -34,6 +41,7 @@ public interface MechanicProfileRepository extends JpaRepository<MechanicProfile
             FROM mechanic_profiles mp
             JOIN users u ON u.id = mp.user_id
             WHERE mp.visible = true
+              AND mp.approval_status = 'APPROVED'
               AND (
                 LOWER(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.surname, ''))) LIKE CONCAT('%', :query, '%')
                 OR LOWER(COALESCE(mp.speciality, '')) LIKE CONCAT('%', :query, '%')

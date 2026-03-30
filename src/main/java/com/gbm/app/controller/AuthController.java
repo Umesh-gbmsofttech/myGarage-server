@@ -10,8 +10,11 @@ import jakarta.validation.Valid;
 
 import com.gbm.app.dto.AuthRequest;
 import com.gbm.app.dto.AuthResponse;
+import com.gbm.app.dto.ForgotPasswordRequest;
+import com.gbm.app.dto.ResetPasswordRequest;
 import com.gbm.app.dto.SignupMechanicRequest;
 import com.gbm.app.dto.SignupOwnerRequest;
+import com.gbm.app.dto.VerifyOtpRequest;
 import com.gbm.app.service.AuthService;
 
 import lombok.RequiredArgsConstructor;
@@ -37,5 +40,20 @@ public class AuthController {
     @PostMapping("/signin")
     public ResponseEntity<AuthResponse> signin(@Valid @RequestBody AuthRequest request) {
         return ResponseEntity.ok(authService.signin(request));
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<?> forgotPassword(@RequestBody ForgotPasswordRequest request) {
+        return ResponseEntity.ok(authService.sendForgotPasswordOtp(request));
+    }
+
+    @PostMapping("/verify-otp")
+    public ResponseEntity<?> verifyOtp(@RequestBody VerifyOtpRequest request) {
+        return ResponseEntity.ok(authService.verifyOtp(request));
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<?> resetPassword(@RequestBody ResetPasswordRequest request) {
+        return ResponseEntity.ok(authService.resetPassword(request));
     }
 }

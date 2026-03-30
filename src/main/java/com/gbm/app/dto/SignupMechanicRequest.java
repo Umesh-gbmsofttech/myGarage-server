@@ -1,7 +1,6 @@
 package com.gbm.app.dto;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 @Data
@@ -22,8 +21,6 @@ public class SignupMechanicRequest {
     private String speciality;
     @NotBlank
     private String city;
-    @NotNull
-    private Boolean shopAct;
-    private Boolean shopActive;
+    private String certificate;
     private String role;
 }

@@ -43,6 +43,12 @@ public class Booking {
     @JoinColumn(name = "mechanic_id", nullable = false)
     private User mechanic;
 
+    @ManyToOne
+    @JoinColumn(name = "assigned_worker_id")
+    private User assignedWorker;
+
+    private Boolean assignedWorkerAccepted = Boolean.FALSE;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private BookingStatus status = BookingStatus.PENDING;
@@ -54,6 +60,12 @@ public class Booking {
     private String vehicleYear;
 
     private String issueDescription;
+
+    private Double serviceLatitude;
+
+    private Double serviceLongitude;
+
+    private String serviceAddress;
 
     private String meetOtp;
 
@@ -73,6 +85,10 @@ public class Booking {
     @ManyToOne
     @JoinColumn(name = "reporter_user_id")
     private User reporter;
+
+    private Double routeDistanceKm;
+
+    private Double routeDurationMinutes;
 
     @Column(nullable = false)
     private Instant createdAt;
